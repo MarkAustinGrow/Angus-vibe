@@ -28,9 +28,21 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
 YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
 
+# OpenAI API key
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# YouTube channel ID (for identifying our own comments)
+YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
+
 # Validate required environment variables
 if not SUPABASE_URL or not SUPABASE_KEY:
     logger.warning("Supabase credentials are missing!")
 
 if not YOUTUBE_CLIENT_ID or not YOUTUBE_CLIENT_SECRET:
     logger.warning("YouTube OAuth credentials are missing!")
+
+if not OPENAI_API_KEY:
+    logger.warning("OpenAI API key is missing!")
+
+if not YOUTUBE_CHANNEL_ID:
+    logger.warning("YouTube channel ID is missing!")

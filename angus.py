@@ -303,27 +303,38 @@ class AgentAngus:
         
         return successful_uploads
     
-    def fetch_comments_for_video(self, youtube_id: str, song_id: str = None) -> int:
+    def fetch_comments_for_video(self, youtube_id: str, song_id: str = None, max_replies: int = None) -> int:
         """
-        Fetch comments for a YouTube video and store them in the feedback table.
+        Fetch comments for a YouTube video, store them in the feedback table,
+        and reply to them using OpenAI.
         
         Args:
             youtube_id: YouTube video ID
             song_id: Optional song ID (if not provided, will be looked up)
+            max_replies: Maximum number of replies to post (None for unlimited)
             
         Returns:
             Number of comments fetched and stored
         """
         logger.info(f"Fetching comments for YouTube video: {youtube_id}")
         
-        # Get song_id if not provided
+        # Get song_id and title if not provided
+        song_title = "Unknown Song"
+        song_style = None
         if not song_id:
-            response = self.supabase.client.table("youtube").select("song_id").eq("youtube_id", youtube_id).execute()
+            response = self.supabase.client.table("youtube").select("song_id,title").eq("youtube_id", youtube_id).execute()
             if response.data and len(response.data) > 0:
                 song_id = response.data[0].get('song_id')
+                song_title = response.data[0].get('title', song_title)
             else:
                 logger.warning(f"No record found for YouTube ID: {youtube_id}")
                 return 0
+        else:
+            # Get song title and style
+            response = self.supabase.client.table("songs").select("title,style").eq("id", song_id).execute()
+            if response.data and len(response.data) > 0:
+                song_title = response.data[0].get('title', song_title)
+                song_style = response.data[0].get('style')
         
         # Fetch comments from YouTube
         comments = self.youtube.fetch_comments(youtube_id)
@@ -332,81 +343,85 @@ class AgentAngus:
             logger.info(f"No comments found for video: {youtube_id}")
             return 0
         
-        # Get existing comment IDs to avoid duplicates
-        try:
-            # Create a tracking table if it doesn't exist
-            self.supabase.client.postgrest.rpc('exec_sql', {
-                'query': """
-                CREATE TABLE IF NOT EXISTS processed_comments (
-                    id SERIAL PRIMARY KEY,
-                    comment_id TEXT UNIQUE,
-                    video_id TEXT,
-                    processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                );
-                """
-            }).execute()
-            
-            # Get already processed comment IDs
-            response = self.supabase.client.postgrest.rpc('exec_sql', {
-                'query': f"SELECT comment_id FROM processed_comments WHERE video_id = '{youtube_id}'"
-            }).execute()
-            
-            processed_comment_ids = set()
-            if response.data:
-                for row in response.data:
-                    processed_comment_ids.add(row.get('comment_id'))
-            
-            logger.info(f"Found {len(processed_comment_ids)} already processed comments")
-            
-        except Exception as e:
-            logger.warning(f"Error checking processed comments: {str(e)}")
-            processed_comment_ids = set()
+        # Get existing comments for this song to avoid duplicates
+        existing_comments = self.supabase.client.table("feedback").select("comments").eq("song_id", song_id).execute()
+        existing_comment_texts = set()
+        if existing_comments.data:
+            for item in existing_comments.data:
+                if item.get('comments'):
+                    existing_comment_texts.add(item.get('comments'))
         
-        # Store comments in feedback table
+        # Store comments in feedback table and reply to them
         new_comments = 0
         for comment in comments:
+            # Check if we've reached the maximum number of replies
+            if max_replies is not None and new_comments >= max_replies:
+                logger.info(f"Reached maximum number of replies ({max_replies}) for video: {youtube_id}")
+                break
+                
             comment_id = comment["comment_id"]
+            comment_text = comment["content"]
             
-            # Skip already processed comments
-            if comment_id in processed_comment_ids:
+            # Skip if we already have this comment text or if we've already replied to it
+            if comment_text in existing_comment_texts:
+                logger.info(f"Comment already exists in feedback table: {comment_text[:30]}...")
+                continue
+            
+            # Skip if we've already replied to this comment
+            if comment.get("has_our_reply", False):
+                logger.info(f"Already replied to comment: {comment_text[:30]}...")
+                
+                # Still store it if we don't have it yet
+                if comment_text not in existing_comment_texts:
+                    feedback_data = {
+                        "song_id": song_id,
+                        "comments": comment_text,
+                    }
+                    self.supabase.client.table("feedback").insert(feedback_data).execute()
+                    logger.info(f"Stored comment that already has a reply: {comment_text[:30]}...")
+                
                 continue
             
             try:
                 # Store in feedback table
                 feedback_data = {
                     "song_id": song_id,
-                    "comments": comment["content"],
-                    # Rating is null by default, could be set based on sentiment analysis
+                    "comments": comment_text,
                 }
                 
                 # Insert into feedback table
                 self.supabase.client.table("feedback").insert(feedback_data).execute()
                 
-                # Mark comment as processed
-                self.supabase.client.table("processed_comments").insert({
-                    "comment_id": comment_id,
-                    "video_id": youtube_id
-                }).execute()
+                # Generate a response using OpenAI
+                from openai_utils import generate_response
+                response_text = generate_response(comment_text, song_title, song_style)
                 
-                new_comments += 1
+                if response_text:
+                    # Reply to the comment
+                    reply_id = self.youtube.reply_to_comment(comment_id, response_text)
+                    
+                    if reply_id:
+                        logger.info(f"Successfully replied to comment: {comment_text[:30]}...")
+                        new_comments += 1
                 
             except Exception as e:
-                logger.error(f"Error storing comment {comment_id}: {str(e)}")
+                logger.error(f"Error processing comment {comment_id}: {str(e)}")
         
-        logger.info(f"Stored {new_comments} new comments in feedback table for video: {youtube_id}")
+        logger.info(f"Processed {new_comments} new comments for video: {youtube_id}")
         return new_comments
     
-    def fetch_comments_for_all_videos(self, limit: int = 10) -> int:
+    def fetch_comments_for_all_videos(self, limit: int = 10, max_total_replies: int = 10) -> int:
         """
         Fetch comments for all uploaded YouTube videos.
         
         Args:
             limit: Maximum number of videos to process
+            max_total_replies: Maximum total number of replies to post across all videos
             
         Returns:
             Total number of comments fetched
         """
-        logger.info(f"Fetching comments for all videos (limit: {limit})")
+        logger.info(f"Fetching comments for all videos (limit: {limit}, max_replies: {max_total_replies})")
         
         try:
             # Get uploaded videos
@@ -418,13 +433,29 @@ class AgentAngus:
             
             # Fetch comments for each video
             total_comments = 0
+            remaining_replies = max_total_replies
+            
             for video in response.data:
                 youtube_id = video.get('youtube_id')
                 song_id = video.get('song_id')
                 
                 if youtube_id:
-                    comments_count = self.fetch_comments_for_video(youtube_id, song_id)
+                    # Calculate how many replies to allow for this video
+                    # If we have 5 videos and want 10 total replies, allocate 2 per video
+                    # But if we've already used some replies, adjust accordingly
+                    replies_per_video = max(1, remaining_replies // len(response.data))
+                    
+                    # Fetch comments and limit replies for this video
+                    comments_count = self.fetch_comments_for_video(youtube_id, song_id, max_replies=replies_per_video)
                     total_comments += comments_count
+                    
+                    # Update remaining replies
+                    remaining_replies -= comments_count
+                    
+                    # If we've reached the maximum total replies, stop
+                    if remaining_replies <= 0:
+                        logger.info(f"Reached maximum total replies ({max_total_replies})")
+                        break
                 
                 # Add a small delay between requests to avoid rate limiting
                 if len(response.data) > 1:
@@ -464,7 +495,7 @@ class AgentAngus:
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             logger.info(f"[{current_time}] Running scheduled comment retrieval")
             try:
-                comments = self.fetch_comments_for_all_videos(limit=10)
+                comments = self.fetch_comments_for_all_videos(limit=10, max_total_replies=10)
                 logger.info(f"[{current_time}] Scheduled comment retrieval complete - fetched {comments} comments")
             except Exception as e:
                 logger.error(f"[{current_time}] Error in scheduled comment retrieval: {str(e)}")
@@ -501,6 +532,7 @@ def main():
     parser.add_argument('--upload', action='store_true', help='Upload pending songs to YouTube')
     parser.add_argument('--fetch-comments', action='store_true', help='Fetch comments for uploaded videos')
     parser.add_argument('--limit', type=int, default=1, help='Limit the number of items to process (default: 1)')
+    parser.add_argument('--max-replies', type=int, default=10, help='Maximum number of comment replies to post (default: 10)')
     parser.add_argument('--daemon', action='store_true', help='Run in daemon mode with scheduled tasks')
     
     args = parser.parse_args()
@@ -530,7 +562,7 @@ def main():
     
     # Fetch comments if requested
     if args.fetch_comments:
-        angus.fetch_comments_for_all_videos(limit=args.limit)
+        angus.fetch_comments_for_all_videos(limit=args.limit, max_total_replies=args.max_replies)
     
     # If no specific action was requested, show help
     if not (args.create_table or args.upload or args.fetch_comments or args.daemon):

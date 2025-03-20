@@ -15,14 +15,17 @@ Agent Angus automates the following tasks:
 - `angus.py` - Main script for Agent Angus
 - `youtube_client.py` - Client for interacting with YouTube API
 - `supabase_client.py` - Client for interacting with Supabase
+- `openai_utils.py` - Utilities for generating responses using OpenAI
 - `create_youtube_table.sql` - SQL script to create the YouTube table in Supabase
+- `requirements.txt` - List of Python dependencies
 - `Roadmap.md` - Project roadmap and implementation details
 
 ## Prerequisites
 
 - Python 3.7+
 - Supabase account with existing songs database
-- YouTube API credentials (API key, OAuth client ID and client secret)
+- YouTube API credentials (API key, OAuth client ID and client secret, channel ID)
+- OpenAI API key (for generating responses to YouTube comments)
 
 ### YouTube API Setup
 
@@ -47,7 +50,12 @@ Agent Angus automates the following tasks:
 
 2. Install dependencies:
    ```bash
-   pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client supabase requests
+   pip install -r requirements.txt
+   ```
+   
+   Or install dependencies manually:
+   ```bash
+   pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client supabase requests openai python-dotenv schedule
    ```
 
 3. Set up environment variables:
@@ -56,10 +64,14 @@ Agent Angus automates the following tasks:
    export YOUTUBE_API_KEY=your-api-key
    export YOUTUBE_CLIENT_ID=your-client-id
    export YOUTUBE_CLIENT_SECRET=your-client-secret
+   export YOUTUBE_CHANNEL_ID=your-channel-id
 
    # Supabase Credentials
    export SUPABASE_URL=your-supabase-url
    export SUPABASE_KEY=your-supabase-key
+   
+   # OpenAI API Credentials
+   export OPENAI_API_KEY=your-openai-api-key
    ```
 
    Alternatively, create a `.env` file with these variables.
@@ -103,12 +115,30 @@ python angus.py --daemon
 ```
 
 In daemon mode, Agent Angus will:
-- Upload up to 3 videos to YouTube every hour
+- Upload 1 video to YouTube every hour
 - Fetch comments from uploaded videos every hour
+- Automatically respond to new comments using OpenAI-generated responses
 - Run continuously until interrupted (Ctrl+C)
 
 This is useful for automating the YouTube publishing and feedback collection process.
 
+
+## Features
+
+### YouTube Video Upload
+Agent Angus automatically uploads videos from your Supabase songs table to YouTube. It ensures that each song is only uploaded once by tracking the upload status in the YouTube table.
+
+### Comment Collection
+Agent Angus fetches comments from your YouTube videos and stores them in the Supabase feedback table for analysis.
+
+### OpenAI-Powered Comment Responses
+Agent Angus uses OpenAI to generate personalized responses to YouTube comments. The system:
+- Fetches new comments from your videos
+- Generates contextual responses based on the song title and style
+- Posts the responses as replies to the comments
+- Tracks which comments have already been responded to
+
+This feature helps engage with your audience automatically and provides a way to track which comments have been processed.
 
 ## Database Schema
 
@@ -177,6 +207,15 @@ If videos fail to upload:
 1. Check that the video URLs in your songs table are valid and accessible
 2. Verify that your YouTube account has upload permissions
 3. Check for any quota limitations on your YouTube API usage
+
+### OpenAI API Issues
+
+If you encounter issues with OpenAI comment responses:
+
+1. Verify your OpenAI API key is correct in the `.env` file
+2. Check that your OpenAI account has sufficient credits
+3. If responses are not being generated, check the OpenAI API status at https://status.openai.com/
+4. Adjust the system prompt in `openai_utils.py` if you want to change the style or length of responses
 
 ## License
 

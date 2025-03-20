@@ -14,7 +14,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
 # Import configuration
-from config import YOUTUBE_API_KEY, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET
+from config import YOUTUBE_API_KEY, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_CHANNEL_ID
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +30,7 @@ class YouTubeClient:
     """
     
     def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None, 
-                 api_key: Optional[str] = None):
+                 api_key: Optional[str] = None, channel_id: Optional[str] = None):
         """
         Initialize the YouTube client.
         
@@ -38,10 +38,12 @@ class YouTubeClient:
             client_id: YouTube OAuth client ID (defaults to environment variable)
             client_secret: YouTube OAuth client secret (defaults to environment variable)
             api_key: YouTube API key (defaults to environment variable)
+            channel_id: YouTube channel ID (defaults to environment variable)
         """
         self.client_id = client_id or YOUTUBE_CLIENT_ID
         self.client_secret = client_secret or YOUTUBE_CLIENT_SECRET
         self.api_key = api_key or YOUTUBE_API_KEY
+        self.channel_id = channel_id or YOUTUBE_CHANNEL_ID
         self.youtube = None
         
         # Validate credentials
@@ -216,6 +218,38 @@ class YouTubeClient:
                     logger.warning(f"Failed to remove temp file, retrying: {str(e)}")
                     time.sleep(1)
     
+    def reply_to_comment(self, comment_id: str, reply_text: str) -> Optional[str]:
+        """
+        Reply to a YouTube comment.
+        
+        Args:
+            comment_id: The ID of the comment to reply to
+            reply_text: The text of the reply
+            
+        Returns:
+            The ID of the reply comment if successful, None otherwise
+        """
+        logger.info(f"Replying to comment: {comment_id}")
+        
+        try:
+            response = self.youtube.comments().insert(
+                part="snippet",
+                body={
+                    "snippet": {
+                        "parentId": comment_id,
+                        "textOriginal": reply_text
+                    }
+                }
+            ).execute()
+            
+            reply_id = response.get("id")
+            logger.info(f"Successfully replied to comment {comment_id} with reply ID: {reply_id}")
+            return reply_id
+            
+        except Exception as e:
+            logger.error(f"Error replying to comment {comment_id}: {str(e)}")
+            return None
+    
     def fetch_comments(self, video_id: str, max_results: int = 100) -> List[Dict[str, Any]]:
         """
         Fetch comments for a YouTube video.
@@ -230,9 +264,9 @@ class YouTubeClient:
         logger.info(f"Fetching comments for video ID: {video_id}")
         
         try:
-            # Fetch comments
+            # Fetch comments with replies
             request = self.youtube.commentThreads().list(
-                part="snippet",
+                part="snippet,replies",
                 videoId=video_id,
                 maxResults=max_results
             )
@@ -244,11 +278,21 @@ class YouTubeClient:
                 comment_id = item["id"]
                 snippet = item["snippet"]["topLevelComment"]["snippet"]
                 
+                # Check if we've already replied to this comment
+                has_our_reply = False
+                if "replies" in item and item["replies"]["comments"]:
+                    for reply in item["replies"]["comments"]:
+                        reply_snippet = reply["snippet"]
+                        if reply_snippet.get("authorChannelId", {}).get("value") == self.channel_id:
+                            has_our_reply = True
+                            break
+                
                 comment_data = {
                     "comment_id": comment_id,
                     "author": snippet["authorDisplayName"],
                     "content": snippet["textOriginal"],
-                    "timestamp": snippet["publishedAt"]
+                    "timestamp": snippet["publishedAt"],
+                    "has_our_reply": has_our_reply
                 }
                 comments.append(comment_data)
             
