@@ -86,13 +86,28 @@ This will upload up to 5 songs that have video URLs but haven't been uploaded to
 
 ### Fetch Comments
 
-Retrieve comments for uploaded YouTube videos and store them in the Supabase comments table:
+Retrieve comments for uploaded YouTube videos and store them in the Supabase feedback table:
 
 ```bash
 python angus.py --fetch-comments --limit 10
 ```
 
-This will fetch comments for up to 10 uploaded videos.
+This will fetch comments for up to 10 uploaded videos and store them in the feedback table.
+
+### Run in Daemon Mode
+
+Run Agent Angus continuously with scheduled tasks:
+
+```bash
+python angus.py --daemon
+```
+
+In daemon mode, Agent Angus will:
+- Upload up to 3 videos to YouTube every hour
+- Fetch comments from uploaded videos every hour
+- Run continuously until interrupted (Ctrl+C)
+
+This is useful for automating the YouTube publishing and feedback collection process.
 
 
 ## Database Schema

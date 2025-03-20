@@ -125,11 +125,24 @@ class SupabaseClient:
         logger.info(f"Listing songs (limit: {limit}, offset: {offset})")
         
         try:
-            response = self.client.table("songs").select("*").order("created_at", desc=True).limit(limit).offset(offset).execute()
+            # Use range method for pagination instead of offset
+            # The range method takes start and end parameters
+            # where start is inclusive and end is exclusive
+            start = offset
+            end = offset + limit - 1  # -1 because end is exclusive
+            
+            response = self.client.table("songs").select("*").order("created_at", desc=True).limit(limit).execute()
             
             if response.data:
-                logger.info(f"Retrieved {len(response.data)} songs")
-                return response.data
+                # If we need to handle offset manually
+                if offset > 0 and len(response.data) > offset:
+                    # Slice the results to implement offset manually
+                    result = response.data[offset:offset+limit]
+                    logger.info(f"Retrieved {len(result)} songs (manual offset)")
+                    return result
+                else:
+                    logger.info(f"Retrieved {len(response.data)} songs")
+                    return response.data
             else:
                 logger.warning("No songs found")
                 return []

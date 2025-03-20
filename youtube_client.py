@@ -191,7 +191,14 @@ class YouTubeClient:
             return response["id"]
             
         except Exception as e:
-            logger.error(f"Error uploading video: {str(e)}")
+            error_str = str(e)
+            logger.error(f"Error uploading video: {error_str}")
+            
+            # Check if this is an upload limit exceeded error
+            if "uploadLimitExceeded" in error_str or "The user has exceeded the number of videos they may upload" in error_str:
+                # Re-raise the exception to be caught by the caller
+                raise
+                
             return None
             
         finally:

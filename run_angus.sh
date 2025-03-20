@@ -7,12 +7,13 @@ show_help() {
     echo ""
     echo "Usage: ./run_angus.sh [command] [options]"
     echo ""
-    echo "Commands:"
-    echo "  setup       Create the YouTube table in Supabase"
-    echo "  upload      Upload pending songs to YouTube"
-    echo "  comments    Fetch comments for uploaded videos"
-    echo "  test        Run tests in simulation mode"
-    echo "  help        Show this help message"
+echo "Commands:"
+echo "  setup       Create the YouTube table in Supabase"
+echo "  upload      Upload pending songs to YouTube"
+echo "  comments    Fetch comments for uploaded videos"
+echo "  daemon      Run in daemon mode with scheduled tasks"
+echo "  test        Run tests in simulation mode"
+echo "  help        Show this help message"
     echo ""
     echo "Options:"
     echo "  --limit N   Limit the number of items to process (default: 10)"
@@ -66,6 +67,10 @@ case $COMMAND in
     comments)
         echo "Fetching comments for uploaded videos (limit: $LIMIT)..."
         python angus.py --fetch-comments --limit $LIMIT $SIMULATE
+        ;;
+    daemon)
+        echo "Starting Agent Angus in daemon mode..."
+        python angus.py --daemon
         ;;
     test)
         echo "Running tests in simulation mode..."

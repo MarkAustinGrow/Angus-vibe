@@ -11,6 +11,7 @@ echo Commands:
 echo   setup       Create the YouTube table in Supabase
 echo   upload      Upload pending songs to YouTube
 echo   comments    Fetch comments for uploaded videos
+echo   daemon      Run in daemon mode with scheduled tasks
 echo   test        Run tests in simulation mode
 echo   help        Show this help message
 echo.
@@ -67,6 +68,11 @@ if "%COMMAND%"=="upload" (
 if "%COMMAND%"=="comments" (
     echo Fetching comments for uploaded videos (limit: %LIMIT%)...
     python angus.py --fetch-comments --limit %LIMIT% %SIMULATE%
+    goto :eof
+)
+if "%COMMAND%"=="daemon" (
+    echo Starting Agent Angus in daemon mode...
+    python angus.py --daemon
     goto :eof
 )
 if "%COMMAND%"=="test" (

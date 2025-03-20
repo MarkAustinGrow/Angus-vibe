@@ -12,7 +12,18 @@ import sys
 import time
 import logging
 import argparse
+import datetime
+import threading
 from typing import Dict, Any, List, Optional
+
+# Import schedule library for task scheduling
+try:
+    import schedule
+except ImportError:
+    print("Schedule library not found. Installing...")
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "schedule"])
+    import schedule
 
 # Import custom modules
 from supabase_client import SupabaseClient
@@ -132,6 +143,9 @@ class AgentAngus:
             
         Returns:
             YouTube video ID if successful, None otherwise
+            
+        Raises:
+            Exception: If there's an error during upload, including upload limit exceeded
         """
         song_id = song.get('id')
         title = song.get('title', 'Untitled Song')
@@ -173,6 +187,24 @@ class AgentAngus:
         except Exception as e:
             upload_error = str(e)
             logger.error(f"Error uploading song '{title}' to YouTube: {upload_error}")
+            
+            # Check if this is an upload limit exceeded error and re-raise it
+            if "uploadLimitExceeded" in upload_error or "The user has exceeded the number of videos they may upload" in upload_error:
+                # Record the failure in the youtube table before re-raising
+                try:
+                    youtube_data = {
+                        "song_id": song_id,
+                        "status": "failed",
+                        "title": title,
+                        "description": f"Upload failed: {upload_error}"
+                    }
+                    self.supabase.client.table("youtube").insert(youtube_data).execute()
+                except Exception as db_error:
+                    logger.error(f"Error recording upload limit failure to Supabase: {str(db_error)}")
+                
+                # Re-raise the exception to be caught by upload_all_pending_songs
+                raise
+            
             return None
         
         finally:
@@ -230,28 +262,50 @@ class AgentAngus:
         
         # Upload each song
         successful_uploads = 0
+        upload_limit_exceeded = False
+        
         for song in songs:
-            youtube_id = self.upload_song_to_youtube(song)
-            if youtube_id:
-                successful_uploads += 1
-            
-            # Add a small delay between uploads to avoid rate limiting
-            if len(songs) > 1:
-                time.sleep(2)
+            # Skip remaining uploads if we've hit the YouTube upload limit
+            if upload_limit_exceeded:
+                logger.warning(f"Skipping upload of '{song.get('title')}' due to YouTube upload limit")
+                continue
+                
+            try:
+                youtube_id = self.upload_song_to_youtube(song)
+                if youtube_id:
+                    successful_uploads += 1
+                
+                # Add a small delay between uploads to avoid rate limiting
+                if len(songs) > 1:
+                    time.sleep(2)
+                    
+            except Exception as e:
+                error_str = str(e)
+                # Check if this is an upload limit exceeded error
+                if "uploadLimitExceeded" in error_str or "The user has exceeded the number of videos they may upload" in error_str:
+                    logger.warning("YouTube upload limit exceeded. Stopping further uploads.")
+                    upload_limit_exceeded = True
+                else:
+                    logger.error(f"Error uploading song '{song.get('title')}': {error_str}")
         
         logger.info(f"Uploaded {successful_uploads} out of {len(songs)} songs")
+        
+        # Return a special code if we hit the upload limit
+        if upload_limit_exceeded:
+            logger.warning("YouTube upload limit reached. Will try again in the next scheduled run.")
+        
         return successful_uploads
     
     def fetch_comments_for_video(self, youtube_id: str, song_id: str = None) -> int:
         """
-        Fetch comments for a YouTube video and store them in the comments table.
+        Fetch comments for a YouTube video and store them in the feedback table.
         
         Args:
             youtube_id: YouTube video ID
             song_id: Optional song ID (if not provided, will be looked up)
             
         Returns:
-            Number of comments fetched
+            Number of comments fetched and stored
         """
         logger.info(f"Fetching comments for YouTube video: {youtube_id}")
         
@@ -271,22 +325,69 @@ class AgentAngus:
             logger.info(f"No comments found for video: {youtube_id}")
             return 0
         
-        # Store comments in Supabase
-        comment_data = []
+        # Get existing comment IDs to avoid duplicates
+        try:
+            # Create a tracking table if it doesn't exist
+            self.supabase.client.postgrest.rpc('exec_sql', {
+                'query': """
+                CREATE TABLE IF NOT EXISTS processed_comments (
+                    id SERIAL PRIMARY KEY,
+                    comment_id TEXT UNIQUE,
+                    video_id TEXT,
+                    processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                """
+            }).execute()
+            
+            # Get already processed comment IDs
+            response = self.supabase.client.postgrest.rpc('exec_sql', {
+                'query': f"SELECT comment_id FROM processed_comments WHERE video_id = '{youtube_id}'"
+            }).execute()
+            
+            processed_comment_ids = set()
+            if response.data:
+                for row in response.data:
+                    processed_comment_ids.add(row.get('comment_id'))
+            
+            logger.info(f"Found {len(processed_comment_ids)} already processed comments")
+            
+        except Exception as e:
+            logger.warning(f"Error checking processed comments: {str(e)}")
+            processed_comment_ids = set()
+        
+        # Store comments in feedback table
+        new_comments = 0
         for comment in comments:
-            comment_data.append({
-                "video_id": youtube_id,
-                "song_id": song_id,
-                "comment_id": comment["comment_id"],
-                "author": comment["author"],
-                "content": comment["content"],
-                "timestamp": comment["timestamp"]
-            })
+            comment_id = comment["comment_id"]
+            
+            # Skip already processed comments
+            if comment_id in processed_comment_ids:
+                continue
+            
+            try:
+                # Store in feedback table
+                feedback_data = {
+                    "song_id": song_id,
+                    "comments": comment["content"],
+                    # Rating is null by default, could be set based on sentiment analysis
+                }
+                
+                # Insert into feedback table
+                self.supabase.client.table("feedback").insert(feedback_data).execute()
+                
+                # Mark comment as processed
+                self.supabase.client.table("processed_comments").insert({
+                    "comment_id": comment_id,
+                    "video_id": youtube_id
+                }).execute()
+                
+                new_comments += 1
+                
+            except Exception as e:
+                logger.error(f"Error storing comment {comment_id}: {str(e)}")
         
-        self.supabase.client.table("comments").insert(comment_data).execute()
-        
-        logger.info(f"Stored {len(comments)} comments for video: {youtube_id}")
-        return len(comments)
+        logger.info(f"Stored {new_comments} new comments in feedback table for video: {youtube_id}")
+        return new_comments
     
     def fetch_comments_for_all_videos(self, limit: int = 10) -> int:
         """
@@ -328,6 +429,61 @@ class AgentAngus:
         except Exception as e:
             logger.error(f"Error fetching comments: {str(e)}")
             return 0
+    
+    def run_scheduled_tasks(self):
+        """
+        Run scheduled tasks continuously.
+        
+        This method sets up scheduled tasks to run at specified intervals:
+        - Upload videos to YouTube every hour
+        - Fetch comments from YouTube videos every hour
+        
+        The method runs indefinitely until interrupted.
+        """
+        logger.info("Starting scheduled task runner")
+        
+        # Define the YouTube upload task
+        def youtube_upload_task():
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(f"[{current_time}] Running scheduled YouTube upload")
+            try:
+                uploaded = self.upload_all_pending_songs(limit=3)  # Limit to avoid YouTube restrictions
+                logger.info(f"[{current_time}] Scheduled upload complete - uploaded {uploaded} videos")
+            except Exception as e:
+                logger.error(f"[{current_time}] Error in scheduled upload: {str(e)}")
+        
+        # Define the comment retrieval task
+        def comment_retrieval_task():
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(f"[{current_time}] Running scheduled comment retrieval")
+            try:
+                comments = self.fetch_comments_for_all_videos(limit=10)
+                logger.info(f"[{current_time}] Scheduled comment retrieval complete - fetched {comments} comments")
+            except Exception as e:
+                logger.error(f"[{current_time}] Error in scheduled comment retrieval: {str(e)}")
+        
+        # Schedule the tasks to run every hour
+        schedule.every(1).hour.do(youtube_upload_task)
+        schedule.every(1).hour.do(comment_retrieval_task)
+        
+        # Run the tasks immediately on startup
+        logger.info("Running initial tasks on startup")
+        youtube_upload_task()
+        comment_retrieval_task()
+        
+        # Run the scheduler loop
+        logger.info("Entering scheduler loop - Agent Angus is now running continuously")
+        while True:
+            try:
+                schedule.run_pending()
+                time.sleep(60)  # Check every minute for pending tasks
+            except KeyboardInterrupt:
+                logger.info("Scheduler interrupted by user - shutting down")
+                break
+            except Exception as e:
+                logger.error(f"Error in scheduler loop: {str(e)}")
+                # Continue running despite errors
+                time.sleep(60)
 
 def main():
     """
@@ -338,11 +494,24 @@ def main():
     parser.add_argument('--upload', action='store_true', help='Upload pending songs to YouTube')
     parser.add_argument('--fetch-comments', action='store_true', help='Fetch comments for uploaded videos')
     parser.add_argument('--limit', type=int, default=10, help='Limit the number of items to process')
+    parser.add_argument('--daemon', action='store_true', help='Run in daemon mode with scheduled tasks')
     
     args = parser.parse_args()
     
     # Initialize Agent Angus
     angus = AgentAngus()
+    
+    # Run in daemon mode if requested
+    if args.daemon:
+        try:
+            logger.info("Starting Agent Angus in daemon mode")
+            # Create the YouTube table if it doesn't exist
+            angus.create_youtube_table()
+            # Run scheduled tasks (this will run indefinitely)
+            angus.run_scheduled_tasks()
+        except KeyboardInterrupt:
+            logger.info("Daemon mode terminated by user")
+        return
     
     # Create YouTube table if requested
     if args.create_table:
@@ -357,7 +526,7 @@ def main():
         angus.fetch_comments_for_all_videos(limit=args.limit)
     
     # If no specific action was requested, show help
-    if not (args.create_table or args.upload or args.fetch_comments):
+    if not (args.create_table or args.upload or args.fetch_comments or args.daemon):
         parser.print_help()
 
 if __name__ == "__main__":

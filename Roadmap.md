@@ -302,15 +302,57 @@ def fetch_comments_for_video(youtube_id):
 1. **Automate Angus' Workflow**  
    - Implement daemon mode with continuous operation
      - Add a scheduler to run tasks at specified intervals
-     - Run YouTube uploads automatically every hour
-     - Limit uploads to 3 videos per hour to avoid YouTube restrictions
      - Implement proper logging for scheduled operations
      - Add graceful shutdown handling
-   - Schedule periodic comment retrieval
-     - Fetch new comments from uploaded videos every hour
-     - Store comments in the feedback table with references to songs
-     - Track which comments have already been processed
-     - Implement sentiment analysis on comments (optional)
+   
+   - **Optimize Hourly Video Upload**
+     - Upload exactly one video per hour (instead of up to 3)
+     - Implement a queue system to ensure videos are uploaded in the correct order
+     - Select the next video based on creation date (oldest first)
+     - Add detailed logging to track when each video is scheduled for upload
+     - Example implementation:
+       ```python
+       def youtube_upload_task():
+           # Get only the next video to upload
+           songs = self.get_songs_to_upload(limit=1)
+           if songs:
+               logger.info(f"Uploading next video in queue: {songs[0].get('title')}")
+               self.upload_song_to_youtube(songs[0])
+           else:
+               logger.info("No pending videos to upload")
+       ```
+   
+   - **Strengthen Duplicate Upload Prevention**
+     - Implement robust SQL query to properly check for already uploaded videos
+     - Add a status field update mechanism to mark songs as "pending", "uploaded", or "failed"
+     - Create a verification step that checks YouTube for the video before marking as successfully uploaded
+     - Example query:
+       ```sql
+       -- More robust query to find songs not yet uploaded
+       SELECT s.* FROM songs s
+       LEFT JOIN youtube y ON s.id = y.song_id
+       WHERE s.video_url IS NOT NULL 
+       AND (y.id IS NULL OR y.status = 'failed')
+       ORDER BY s.created_at ASC
+       LIMIT 1
+       ```
+   
+   - **Improve Comment Collection Tracking**
+     - Enhance the processed_comments table schema to include more metadata
+     - Implement a more efficient comment comparison algorithm to ensure no duplicates
+     - Add periodic verification to check for comment consistency between YouTube and the database
+     - Example schema:
+       ```sql
+       CREATE TABLE IF NOT EXISTS processed_comments (
+           id SERIAL PRIMARY KEY,
+           comment_id TEXT UNIQUE,
+           video_id TEXT,
+           content_hash TEXT,  -- Hash of comment content for verification
+           processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+           last_verified_at TIMESTAMP WITH TIME ZONE
+       );
+       ```
+   
    - Handle YouTube API rate limits and quotas
 
 2. **Expand Functionality**  
