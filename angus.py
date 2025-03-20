@@ -91,7 +91,7 @@ class AgentAngus:
     
     def get_songs_to_upload(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
-        Get songs from Supabase that haven't been uploaded to YouTube yet.
+        Get songs from Supabase that haven't been successfully uploaded to YouTube yet.
         
         Args:
             limit: Maximum number of songs to return
@@ -102,30 +102,37 @@ class AgentAngus:
         logger.info(f"Getting songs to upload (limit: {limit})")
         
         try:
-            # Query to find songs with video_url that haven't been uploaded to YouTube yet
+            # Query to find songs with video_url that haven't been successfully uploaded to YouTube yet
             query = """
             SELECT s.* FROM songs s
-            LEFT JOIN youtube y ON s.id = y.song_id
-            WHERE s.video_url IS NOT NULL AND y.id IS NULL
+            WHERE s.video_url IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM youtube y 
+                WHERE y.song_id = s.id 
+                AND y.status = 'uploaded'
+            )
             ORDER BY s.created_at DESC
             LIMIT $1
             """
             
-            # This is a placeholder - the actual implementation would depend on how
-            # your Supabase client handles parameterized queries
-            # response = self.supabase.execute_sql(query, [limit])
-            
             # For now, we'll use the list_songs method and filter manually
             all_songs = self.supabase.list_songs(limit=50)
             
-            # Filter songs that have video_url
-            songs_with_videos = [
+            # Get all successfully uploaded song IDs
+            response = self.supabase.client.table("youtube").select("song_id").eq("status", "uploaded").execute()
+            uploaded_song_ids = set()
+            if response.data:
+                for item in response.data:
+                    uploaded_song_ids.add(item.get('song_id'))
+            
+            # Filter songs that have video_url and haven't been successfully uploaded
+            songs_to_upload = [
                 song for song in all_songs 
-                if song.get('video_url')
+                if song.get('video_url') and song.get('id') not in uploaded_song_ids
             ]
             
             # Limit the number of songs
-            songs_to_upload = songs_with_videos[:limit]
+            songs_to_upload = songs_to_upload[:limit]
             
             logger.info(f"Found {len(songs_to_upload)} songs to upload")
             return songs_to_upload
@@ -447,7 +454,7 @@ class AgentAngus:
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             logger.info(f"[{current_time}] Running scheduled YouTube upload")
             try:
-                uploaded = self.upload_all_pending_songs(limit=3)  # Limit to avoid YouTube restrictions
+                uploaded = self.upload_all_pending_songs(limit=1)  # Only upload 1 video at a time
                 logger.info(f"[{current_time}] Scheduled upload complete - uploaded {uploaded} videos")
             except Exception as e:
                 logger.error(f"[{current_time}] Error in scheduled upload: {str(e)}")
@@ -493,7 +500,7 @@ def main():
     parser.add_argument('--create-table', action='store_true', help='Create the YouTube table in Supabase')
     parser.add_argument('--upload', action='store_true', help='Upload pending songs to YouTube')
     parser.add_argument('--fetch-comments', action='store_true', help='Fetch comments for uploaded videos')
-    parser.add_argument('--limit', type=int, default=10, help='Limit the number of items to process')
+    parser.add_argument('--limit', type=int, default=1, help='Limit the number of items to process (default: 1)')
     parser.add_argument('--daemon', action='store_true', help='Run in daemon mode with scheduled tasks')
     
     args = parser.parse_args()
