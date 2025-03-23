@@ -19,6 +19,13 @@ Agent Angus automates the following tasks:
 - `create_youtube_table.sql` - SQL script to create the YouTube table in Supabase
 - `requirements.txt` - List of Python dependencies
 - `Roadmap.md` - Project roadmap and implementation details
+- `TESTING.md` - Documentation for testing the OpenAI comment response feature
+- Test scripts:
+  - `test_openai_response.py` - Tests OpenAI response generation
+  - `test_youtube_reply.py` - Tests YouTube comment reply functionality
+  - `test_comment_response_flow.py` - Tests the complete comment response flow
+  - `test_fetch_specific_video.py` - Tests fetching comments for a specific video
+  - `test_angus_specific_video.py` - Tests running Angus on a specific video
 
 ## Prerequisites
 
@@ -98,13 +105,18 @@ This will upload up to 5 songs that have video URLs but haven't been uploaded to
 
 ### Fetch Comments
 
-Retrieve comments for uploaded YouTube videos and store them in the Supabase feedback table:
+Retrieve comments for uploaded YouTube videos, store them in the Supabase feedback table, and reply to them:
 
 ```bash
-python angus.py --fetch-comments --limit 10
+python angus.py --fetch-comments --limit 10 --max-replies 10
 ```
 
-This will fetch comments for up to 10 uploaded videos and store them in the feedback table.
+This will:
+- Fetch comments for up to 10 uploaded videos
+- Store them in the feedback table
+- Reply to up to 10 comments across all videos using OpenAI-generated responses
+
+You can adjust the `--max-replies` parameter (default: 10) to control how many comments to reply to in a single run.
 
 ### Run in Daemon Mode
 
@@ -116,8 +128,9 @@ python angus.py --daemon
 
 In daemon mode, Agent Angus will:
 - Upload 1 video to YouTube every hour
-- Fetch comments from uploaded videos every hour
-- Automatically respond to new comments using OpenAI-generated responses
+- Fetch comments from up to 10 videos every hour
+- Automatically respond to up to 10 new comments per hour using OpenAI-generated responses
+- Distribute replies fairly across videos
 - Run continuously until interrupted (Ctrl+C)
 
 This is useful for automating the YouTube publishing and feedback collection process.
@@ -137,6 +150,14 @@ Agent Angus uses OpenAI to generate personalized responses to YouTube comments. 
 - Generates contextual responses based on the song title and style
 - Posts the responses as replies to the comments
 - Tracks which comments have already been responded to
+- Intelligently distributes replies across multiple videos
+- Limits the number of replies per hour to avoid rate limiting
+
+The multi-comment reply capability ensures that:
+- Up to 10 comments (configurable) are replied to per hour
+- Replies are distributed fairly across all videos
+- Comments that already have replies are skipped
+- All processed comments are stored in the feedback table
 
 This feature helps engage with your audience automatically and provides a way to track which comments have been processed.
 
@@ -216,6 +237,56 @@ If you encounter issues with OpenAI comment responses:
 2. Check that your OpenAI account has sufficient credits
 3. If responses are not being generated, check the OpenAI API status at https://status.openai.com/
 4. Adjust the system prompt in `openai_utils.py` if you want to change the style or length of responses
+
+## Testing
+
+Agent Angus includes several test scripts to verify different aspects of the system:
+
+### OpenAI Response Testing
+
+Test the OpenAI response generation without requiring YouTube integration:
+
+```bash
+python test_openai_response.py
+```
+
+This tests the ability to generate contextual responses to comments using OpenAI.
+
+### YouTube Reply Testing
+
+Test replying to a specific YouTube comment:
+
+```bash
+python test_youtube_reply.py --video-id VIDEO_ID [--comment-id COMMENT_ID]
+```
+
+This tests the ability to fetch comments and post replies on YouTube.
+
+### Complete Flow Testing
+
+Test the entire comment response flow:
+
+```bash
+python test_comment_response_flow.py --video-id VIDEO_ID
+```
+
+This tests the complete process from fetching comments to generating responses and posting replies.
+
+### Specific Video Testing
+
+Test fetching comments for a specific video and checking if they have replies:
+
+```bash
+python test_fetch_specific_video.py --video-id VIDEO_ID
+```
+
+Test running Angus on a specific video:
+
+```bash
+python test_angus_specific_video.py --video-id VIDEO_ID
+```
+
+For more detailed testing instructions, see the [TESTING.md](TESTING.md) file.
 
 ## License
 

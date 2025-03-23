@@ -544,8 +544,6 @@ def main():
     if args.daemon:
         try:
             logger.info("Starting Agent Angus in daemon mode")
-            # Create the YouTube table if it doesn't exist
-            angus.create_youtube_table()
             # Run scheduled tasks (this will run indefinitely)
             angus.run_scheduled_tasks()
         except KeyboardInterrupt:
