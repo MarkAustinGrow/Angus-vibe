@@ -14,6 +14,7 @@ import logging
 import argparse
 import datetime
 import threading
+import json
 from typing import Dict, Any, List, Optional
 
 # Import schedule library for task scheduling
@@ -40,6 +41,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class SupabaseLogHandler(logging.Handler):
+    """
+    Custom logging handler that sends logs to a Supabase table.
+    """
+    def __init__(self, supabase_client):
+        super().__init__()
+        self.supabase = supabase_client
+        
+    def emit(self, record):
+        try:
+            # Extract exception info if present
+            exc_info = None
+            if record.exc_info:
+                exc_info = self.formatter.formatException(record.exc_info)
+            
+            # Format the log message
+            log_entry = {
+                "level": record.levelname,
+                "source": record.name,
+                "message": self.format(record),
+                "details": {
+                    "lineno": record.lineno,
+                    "funcName": record.funcName,
+                    "pathname": record.pathname,
+                    "exc_info": exc_info
+                }
+            }
+            
+            # Insert into Supabase
+            self.supabase.client.table("angus_logs").insert(log_entry).execute()
+        except Exception:
+            # Don't let logging errors crash the application
+            self.handleError(record)
+
 class AgentAngus:
     """
     Agent Angus automates YouTube publishing and feedback collection.
@@ -52,6 +87,16 @@ class AgentAngus:
         # Initialize clients
         self.supabase = SupabaseClient()
         self.youtube = YouTubeClient()
+        
+        # Add Supabase log handler
+        try:
+            supabase_handler = SupabaseLogHandler(self.supabase)
+            supabase_handler.setLevel(logging.INFO)  # Only log INFO and above
+            supabase_handler.setFormatter(logging.Formatter('%(message)s'))
+            logger.addHandler(supabase_handler)
+            logger.info("Supabase log handler initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase log handler: {str(e)}")
         
         logger.info("Agent Angus initialized")
     
@@ -524,6 +569,28 @@ class AgentAngus:
             logger.error(f"Error fetching comments: {str(e)}")
             return 0
     
+    def cleanup_old_logs(self, days_to_keep=7):
+        """
+        Remove logs older than the specified number of days.
+        
+        Args:
+            days_to_keep: Number of days of logs to keep
+            
+        Returns:
+            Number of logs deleted
+        """
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(days=days_to_keep)
+        
+        try:
+            # Delete logs older than cutoff_date
+            response = self.supabase.client.table("angus_logs").delete().lt("timestamp", cutoff_date.isoformat()).execute()
+            deleted_count = len(response.data) if response.data else 0
+            logger.info(f"Cleaned up {deleted_count} logs older than {days_to_keep} days")
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Error cleaning up old logs: {str(e)}")
+            return 0
+    
     def run_scheduled_tasks(self):
         """
         Run scheduled tasks continuously.
@@ -531,6 +598,7 @@ class AgentAngus:
         This method sets up scheduled tasks to run at specified intervals:
         - Upload videos to YouTube every hour
         - Fetch comments from YouTube videos every hour
+        - Clean up old logs every day
         
         The method runs indefinitely until interrupted.
         """
@@ -556,9 +624,20 @@ class AgentAngus:
             except Exception as e:
                 logger.error(f"[{current_time}] Error in scheduled comment retrieval: {str(e)}")
         
+        # Define the log cleanup task
+        def log_cleanup_task():
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(f"[{current_time}] Running scheduled log cleanup")
+            try:
+                deleted = self.cleanup_old_logs(days_to_keep=7)  # Keep logs for 7 days
+                logger.info(f"[{current_time}] Scheduled log cleanup complete - deleted {deleted} old logs")
+            except Exception as e:
+                logger.error(f"[{current_time}] Error in scheduled log cleanup: {str(e)}")
+        
         # Schedule the tasks to run every hour
         schedule.every(1).hour.do(youtube_upload_task)
         schedule.every(1).hour.do(comment_retrieval_task)
+        schedule.every(1).day.at("00:00").do(log_cleanup_task)  # Run once per day at midnight
         
         # Run the tasks immediately on startup
         logger.info("Running initial tasks on startup")
