@@ -164,6 +164,21 @@ class AgentAngus:
         
         logger.info(f"Uploading song '{title}' to YouTube")
         
+        # Check if there are any existing records for this song
+        existing_records = None
+        try:
+            existing_response = self.supabase.client.table("youtube").select("id, status").eq("song_id", song_id).execute()
+            existing_records = existing_response.data if existing_response.data else []
+            
+            # Log existing records for debugging
+            if existing_records:
+                logger.info(f"Found {len(existing_records)} existing records for song '{title}'")
+                for record in existing_records:
+                    logger.info(f"  Record ID: {record.get('id')}, Status: {record.get('status')}")
+        except Exception as e:
+            logger.error(f"Error checking for existing records: {str(e)}")
+            existing_records = []
+        
         youtube_id = None
         upload_error = None
         
@@ -197,7 +212,7 @@ class AgentAngus:
             
             # Check if this is an upload limit exceeded error and re-raise it
             if "uploadLimitExceeded" in upload_error or "The user has exceeded the number of videos they may upload" in upload_error:
-                # Record the failure in the youtube table before re-raising
+                # Update or record the failure in the youtube table before re-raising
                 try:
                     youtube_data = {
                         "song_id": song_id,
@@ -205,7 +220,17 @@ class AgentAngus:
                         "title": title,
                         "description": f"Upload failed: {upload_error}"
                     }
-                    self.supabase.client.table("youtube").insert(youtube_data).execute()
+                    
+                    # Update existing record or insert new one
+                    if existing_records:
+                        # Update the first record
+                        record_id = existing_records[0].get('id')
+                        self.supabase.client.table("youtube").update(youtube_data).eq("id", record_id).execute()
+                        logger.info(f"Updated existing record {record_id} with upload failure")
+                    else:
+                        # Insert new record
+                        self.supabase.client.table("youtube").insert(youtube_data).execute()
+                        logger.info(f"Inserted new record for upload failure")
                 except Exception as db_error:
                     logger.error(f"Error recording upload limit failure to Supabase: {str(db_error)}")
                 
@@ -227,7 +252,24 @@ class AgentAngus:
                 }
                 
                 try:
-                    self.supabase.client.table("youtube").insert(youtube_data).execute()
+                    # If there are existing records, update the first one and delete the rest
+                    if existing_records:
+                        # Update the first record
+                        record_id = existing_records[0].get('id')
+                        self.supabase.client.table("youtube").update(youtube_data).eq("id", record_id).execute()
+                        logger.info(f"Updated existing record {record_id} with successful upload")
+                        
+                        # Delete any additional records
+                        if len(existing_records) > 1:
+                            for record in existing_records[1:]:
+                                delete_id = record.get('id')
+                                self.supabase.client.table("youtube").delete().eq("id", delete_id).execute()
+                                logger.info(f"Deleted duplicate record {delete_id} for song '{title}'")
+                    else:
+                        # Insert new record
+                        self.supabase.client.table("youtube").insert(youtube_data).execute()
+                        logger.info(f"Inserted new record for successful upload")
+                    
                     logger.info(f"Successfully uploaded '{title}' to YouTube with ID: {youtube_id}")
                 except Exception as e:
                     logger.error(f"Error recording successful upload to Supabase: {str(e)}")
@@ -242,7 +284,16 @@ class AgentAngus:
                 }
                 
                 try:
-                    self.supabase.client.table("youtube").insert(youtube_data).execute()
+                    # If there are existing records, update the first one
+                    if existing_records:
+                        # Update the first record
+                        record_id = existing_records[0].get('id')
+                        self.supabase.client.table("youtube").update(youtube_data).eq("id", record_id).execute()
+                        logger.info(f"Updated existing record {record_id} with upload failure")
+                    else:
+                        # Insert new record
+                        self.supabase.client.table("youtube").insert(youtube_data).execute()
+                        logger.info(f"Inserted new record for upload failure")
                 except Exception as e:
                     logger.error(f"Error recording failed upload to Supabase: {str(e)}")
         
