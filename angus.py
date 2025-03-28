@@ -395,12 +395,15 @@ class AgentAngus:
             return 0
         
         # Get existing comments for this song to avoid duplicates
-        existing_comments = self.supabase.client.table("feedback").select("comments").eq("song_id", song_id).execute()
+        existing_comments = self.supabase.client.table("feedback").select("comments, comment_id").eq("song_id", song_id).execute()
         existing_comment_texts = set()
+        existing_comment_ids = set()
         if existing_comments.data:
             for item in existing_comments.data:
                 if item.get('comments'):
                     existing_comment_texts.add(item.get('comments'))
+                if item.get('comment_id'):
+                    existing_comment_ids.add(item.get('comment_id'))
         
         # Store comments in feedback table and reply to them
         new_comments = 0
@@ -413,9 +416,9 @@ class AgentAngus:
             comment_id = comment["comment_id"]
             comment_text = comment["content"]
             
-            # Skip if we already have this comment text or if we've already replied to it
-            if comment_text in existing_comment_texts:
-                logger.info(f"Comment already exists in feedback table: {comment_text[:30]}...")
+            # Skip if we already have this comment ID
+            if comment_id in existing_comment_ids:
+                logger.info(f"Comment ID already exists in feedback table: {comment_id}")
                 continue
             
             # Skip if we've already replied to this comment
@@ -423,10 +426,11 @@ class AgentAngus:
                 logger.info(f"Already replied to comment: {comment_text[:30]}...")
                 
                 # Still store it if we don't have it yet
-                if comment_text not in existing_comment_texts:
+                if comment_id not in existing_comment_ids:
                     feedback_data = {
                         "song_id": song_id,
                         "comments": comment_text,
+                        "comment_id": comment_id
                     }
                     self.supabase.client.table("feedback").insert(feedback_data).execute()
                     logger.info(f"Stored comment that already has a reply: {comment_text[:30]}...")
@@ -438,6 +442,7 @@ class AgentAngus:
                 feedback_data = {
                     "song_id": song_id,
                     "comments": comment_text,
+                    "comment_id": comment_id
                 }
                 
                 # Insert into feedback table
