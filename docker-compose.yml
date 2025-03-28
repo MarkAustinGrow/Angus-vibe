@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  angus:
+    build: .
+    restart: always
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

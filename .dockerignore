@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.env.example
+.git
+.gitignore
+.vscode
+*.log
+token.pickle
+data/token.pickle

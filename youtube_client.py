@@ -64,17 +64,37 @@ class YouTubeClient:
         Authenticate with YouTube API using OAuth 2.0.
         """
         creds = None
+        force_new_auth = False
         
-        # Check if we have stored credentials
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                creds = pickle.load(token)
+        # Check for token in data directory first (for Docker), then in current directory
+        token_paths = ['/app/data/token.pickle', './data/token.pickle', 'token.pickle']
+        token_path_used = None
+        
+        for token_path in token_paths:
+            if os.path.exists(token_path):
+                try:
+                    with open(token_path, 'rb') as token:
+                        creds = pickle.load(token)
+                    logger.info(f"Loaded credentials from {token_path}")
+                    token_path_used = token_path
+                    break
+                except Exception as e:
+                    logger.warning(f"Error loading credentials from {token_path}: {str(e)}")
+                    force_new_auth = True
         
         # If credentials don't exist or are invalid, get new ones
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
+        if not creds or not creds.valid or force_new_auth:
+            if creds and creds.expired and creds.refresh_token and not force_new_auth:
+                try:
+                    creds.refresh(Request())
+                    logger.info("Refreshed expired credentials")
+                except Exception as e:
+                    logger.warning(f"Error refreshing credentials: {str(e)}")
+                    # If refresh fails, force new authentication
+                    creds = None
+            
+            # If we still don't have valid credentials, get new ones
+            if not creds or not creds.valid:
                 # Create client_secrets.json file for OAuth flow
                 client_secrets = {
                     "installed": {
@@ -121,8 +141,17 @@ class YouTubeClient:
                         os.remove(client_secrets_file)
                 
                 # Save credentials for future use
-                with open('token.pickle', 'wb') as token:
-                    pickle.dump(creds, token)
+                # Try to save in data directory first, then in current directory
+                for save_path in ['/app/data', './data', '.']:
+                    try:
+                        os.makedirs(save_path, exist_ok=True)
+                        token_file = os.path.join(save_path, 'token.pickle')
+                        with open(token_file, 'wb') as token:
+                            pickle.dump(creds, token)
+                        logger.info(f"Saved credentials to {token_file}")
+                        break
+                    except Exception as e:
+                        logger.warning(f"Could not save credentials to {save_path}: {str(e)}")
         
         # Build YouTube API client
         self.youtube = build("youtube", "v3", credentials=creds)
