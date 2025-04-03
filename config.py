@@ -34,6 +34,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # YouTube channel ID (for identifying our own comments)
 YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
 
+# Sonoteller API key
+SONOTELLER_API_KEY = os.getenv("SONOTELLER_API_KEY", "58fafc6204msh41ac38769729b59p17fbc3jsneeebeb330eb2")
+
 # Validate required environment variables
 if not SUPABASE_URL or not SUPABASE_KEY:
     logger.warning("Supabase credentials are missing!")
@@ -46,3 +49,6 @@ if not OPENAI_API_KEY:
 
 if not YOUTUBE_CHANNEL_ID:
     logger.warning("YouTube channel ID is missing!")
+
+if not SONOTELLER_API_KEY:
+    logger.warning("Sonoteller API key is missing!")

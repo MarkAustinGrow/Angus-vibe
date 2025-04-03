@@ -12,12 +12,14 @@ echo "  setup       Create the YouTube table in Supabase"
 echo "  upload      Upload pending songs to YouTube"
 echo "  comments    Fetch comments for uploaded videos"
 echo "  daemon      Run in daemon mode with scheduled tasks"
+echo "  web         Run the web UI for Sonoteller analysis"
 echo "  test        Run tests in simulation mode"
 echo "  help        Show this help message"
     echo ""
     echo "Options:"
     echo "  --limit N   Limit the number of items to process (default: 10)"
     echo "  --simulate  Run in simulation mode without making actual API calls"
+    echo "  --port N    Port for the web UI (default: 5000)"
     echo ""
     echo "Examples:"
     echo "  ./run_angus.sh setup"
@@ -30,6 +32,7 @@ echo "  help        Show this help message"
 # Default values
 LIMIT=10
 SIMULATE=""
+PORT=5000
 
 # Parse command
 COMMAND=$1
@@ -45,6 +48,10 @@ while [[ $# -gt 0 ]]; do
         --simulate)
             SIMULATE="--simulate"
             shift
+            ;;
+        --port)
+            PORT=$2
+            shift 2
             ;;
         *)
             echo "Unknown option: $1"
@@ -71,6 +78,10 @@ case $COMMAND in
     daemon)
         echo "Starting Agent Angus in daemon mode..."
         python angus.py --daemon
+        ;;
+    web)
+        echo "Starting Agent Angus web UI on port $PORT..."
+        python angus.py --web --port $PORT
         ;;
     test)
         echo "Running tests in simulation mode..."

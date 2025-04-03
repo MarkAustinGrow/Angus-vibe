@@ -29,6 +29,7 @@ except ImportError:
 # Import custom modules
 from supabase_client import SupabaseClient
 from youtube_client import YouTubeClient
+from web_ui import run_web_ui
 
 # Configure logging
 logging.basicConfig(
@@ -669,6 +670,8 @@ def main():
     parser.add_argument('--limit', type=int, default=1, help='Limit the number of items to process (default: 1)')
     parser.add_argument('--max-replies', type=int, default=10, help='Maximum number of comment replies to post (default: 10)')
     parser.add_argument('--daemon', action='store_true', help='Run in daemon mode with scheduled tasks')
+    parser.add_argument('--web', action='store_true', help='Run the web UI')
+    parser.add_argument('--port', type=int, default=5000, help='Port for the web UI (default: 5000)')
     
     args = parser.parse_args()
     
@@ -685,6 +688,15 @@ def main():
             logger.info("Daemon mode terminated by user")
         return
     
+    # Run web UI if requested
+    if args.web:
+        try:
+            logger.info(f"Starting web UI on port {args.port}")
+            run_web_ui(port=args.port, debug=True)
+        except KeyboardInterrupt:
+            logger.info("Web UI terminated by user")
+        return
+    
     # Create YouTube table if requested
     if args.create_table:
         angus.create_youtube_table()
@@ -698,7 +710,7 @@ def main():
         angus.fetch_comments_for_all_videos(limit=args.limit, max_total_replies=args.max_replies)
     
     # If no specific action was requested, show help
-    if not (args.create_table or args.upload or args.fetch_comments or args.daemon):
+    if not (args.create_table or args.upload or args.fetch_comments or args.daemon or args.web):
         parser.print_help()
 
 if __name__ == "__main__":

@@ -12,12 +12,14 @@ echo   setup       Create the YouTube table in Supabase
 echo   upload      Upload pending songs to YouTube
 echo   comments    Fetch comments for uploaded videos
 echo   daemon      Run in daemon mode with scheduled tasks
+echo   web         Run the web UI for Sonoteller analysis
 echo   test        Run tests in simulation mode
 echo   help        Show this help message
 echo.
 echo Options:
 echo   --limit N   Limit the number of items to process (default: 10)
 echo   --simulate  Run in simulation mode without making actual API calls
+echo   --port N    Port for the web UI (default: 5000)
 echo.
 echo Examples:
 echo   run_angus.bat setup
@@ -30,6 +32,7 @@ goto :eof
 REM Default values
 set LIMIT=10
 set SIMULATE=
+set PORT=5000
 
 REM Parse command
 set COMMAND=%1
@@ -46,6 +49,12 @@ if "%1"=="--limit" (
 )
 if "%1"=="--simulate" (
     set SIMULATE=--simulate
+    shift
+    goto parse_args
+)
+if "%1"=="--port" (
+    set PORT=%2
+    shift
     shift
     goto parse_args
 )
@@ -73,6 +82,11 @@ if "%COMMAND%"=="comments" (
 if "%COMMAND%"=="daemon" (
     echo Starting Agent Angus in daemon mode...
     python angus.py --daemon
+    goto :eof
+)
+if "%COMMAND%"=="web" (
+    echo Starting Agent Angus web UI on port %PORT%...
+    python angus.py --web --port %PORT%
     goto :eof
 )
 if "%COMMAND%"=="test" (

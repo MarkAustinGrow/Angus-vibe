@@ -8,6 +8,7 @@ Agent Angus is an AI agent that automates YouTube publishing and audience feedba
 2. Tracks uploaded videos in a YouTube table in Supabase
 3. Retrieves and stores YouTube comments in the Supabase database for analysis
 4. Responds to YouTube comments using OpenAI-generated responses
+5. Analyzes music using the Sonoteller API and stores results in Supabase
 
 ## System Architecture
 
@@ -17,8 +18,10 @@ Agent Angus consists of several key components that work together:
 2. **Supabase Client (supabase_client.py)**: Manages database operations with Supabase, including storing video information and comments.
 3. **YouTube Client (youtube_client.py)**: Handles all interactions with the YouTube API, including video uploads, comment fetching, and comment replies.
 4. **OpenAI Utilities (openai_utils.py)**: Generates responses to YouTube comments using OpenAI's API.
-5. **Database Schema (create_youtube_table.sql)**: Defines the structure of the YouTube table in Supabase.
-6. **Test Scripts**: Various scripts to test different aspects of the system.
+5. **Sonoteller Client (sonoteller_client.py)**: Handles interactions with the Sonoteller API for music analysis.
+6. **Web UI (web_ui.py)**: Provides a web interface for analyzing music using the Sonoteller API.
+7. **Database Schema (create_youtube_table.sql)**: Defines the structure of the YouTube table in Supabase.
+8. **Test Scripts**: Various scripts to test different aspects of the system.
 
 ## Component Documentation
 
@@ -255,6 +258,8 @@ if __name__ == "__main__":
 - `--limit`: Limit the number of items to process (default: 1)
 - `--max-replies`: Maximum number of comment replies to post (default: 10)
 - `--daemon`: Run in daemon mode with scheduled tasks
+- `--web`: Run the web UI for Sonoteller analysis
+- `--port`: Port for the web UI (default: 5000)
 
 ### 2. SupabaseClient (supabase_client.py)
 
@@ -561,6 +566,111 @@ else:
 
 **Error Handling**: Returns None if an error occurs during the API call.
 
+### 5. SonotellerClient (sonoteller_client.py)
+
+The `SonotellerClient` class handles all interactions with the Sonoteller API for music analysis.
+
+#### Class: `SonotellerClient`
+
+##### Constructor
+
+```python
+def __init__(self, api_key: str)
+```
+
+**Description**: Initializes the Sonoteller client with the provided API key.
+
+**Parameters**:
+- `api_key` (str): Sonoteller API key
+
+**Returns**: None
+
+**Example**:
+```python
+# Using environment variable
+from config import SONOTELLER_API_KEY
+sonoteller = SonotellerClient(SONOTELLER_API_KEY)
+```
+
+##### Method: `analyze_music`
+
+```python
+def analyze_music(self, file_url: str) -> Optional[Dict[str, Any]]
+```
+
+**Description**: Analyze a music file using the Sonoteller API.
+
+**Parameters**:
+- `file_url` (str): URL of the music file to analyze (.mp3) or YouTube URL
+
+**Returns**:
+- `Optional[Dict[str, Any]]`: Dictionary with analysis results, or None if an error occurs
+
+**Example**:
+```python
+analysis = sonoteller.analyze_music("https://example.com/song.mp3")
+if analysis:
+    print(f"Language: {analysis.get('language')}")
+    print(f"Summary: {analysis.get('summary')}")
+else:
+    print("Failed to analyze music")
+```
+
+**Error Handling**:
+- Handles YouTube URLs by using a sample MP3 for testing
+- Returns detailed error information if the API call fails
+- Provides a mock response for testing when the API is unavailable
+
+### 6. Web UI (web_ui.py)
+
+The `web_ui.py` module provides a web interface for analyzing music using the Sonoteller API.
+
+#### Function: `run_web_ui`
+
+```python
+def run_web_ui(host='0.0.0.0', port=5000, debug=False)
+```
+
+**Description**: Run the web UI for Sonoteller analysis.
+
+**Parameters**:
+- `host` (str, optional): Host to bind to. Defaults to '0.0.0.0'.
+- `port` (int, optional): Port to bind to. Defaults to 5000.
+- `debug` (bool, optional): Whether to run in debug mode. Defaults to False.
+
+**Returns**: None
+
+**Example**:
+```python
+# Run the web UI on port 8080
+run_web_ui(port=8080)
+```
+
+#### Route: `/`
+
+**Description**: Renders the main page of the web UI.
+
+**Method**: GET
+
+**Returns**: HTML page with a form for entering a music URL.
+
+#### Route: `/analyze`
+
+**Description**: Analyzes a music file using the Sonoteller API.
+
+**Method**: POST
+
+**Parameters**:
+- `url` (str): URL of the music file to analyze (.mp3) or YouTube URL
+- `song_id` (str, optional): Optional song ID to associate with the analysis
+
+**Returns**: JSON response with analysis results.
+
+**Error Handling**:
+- Returns a 400 error if no URL is provided
+- Returns a 500 error if the analysis fails
+- Stores the analysis in the influence_music table in Supabase
+
 ## Database Schema
 
 ### YouTube Table
@@ -658,6 +768,34 @@ Tests running Angus on a specific video.
 python test_angus_specific_video.py --video-id VIDEO_ID
 ```
 
+### Influence Music Table
+
+The Influence Music table stores Sonoteller analysis results:
+
+```sql
+create table if not exists influence_music (
+  id uuid default uuid_generate_v4() primary key,
+  song_id uuid references songs(id),
+  url text not null,
+  analysis jsonb not null,
+  created_at timestamp with time zone default now()
+);
+
+-- Create index for faster lookups
+create index if not exists influence_music_song_id_idx on influence_music(song_id);
+
+-- Add comment to explain table purpose
+comment on table influence_music is 'Stores Sonoteller analysis results for influence music';
+```
+
+| Field Name      | Type        | Description                                  |
+|----------------|------------|----------------------------------------------|
+| `id` (PK)      | `uuid`      | Unique ID, primary key (auto-generated)     |
+| `song_id`      | `uuid`      | Reference to songs table (optional)         |
+| `url`          | `text`      | URL of the analyzed music file              |
+| `analysis`     | `jsonb`     | JSON data with Sonoteller analysis results  |
+| `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
+
 ## Command-Line Interface
 
 Agent Angus provides a command-line interface for various operations:
@@ -673,6 +811,8 @@ python angus.py [options]
 - `--limit N`: Limit the number of items to process (default: 1)
 - `--max-replies N`: Maximum number of comment replies to post (default: 10)
 - `--daemon`: Run in daemon mode with scheduled tasks
+- `--web`: Run the web UI for Sonoteller analysis
+- `--port N`: Port for the web UI (default: 5000)
 
 **Examples**:
 
@@ -696,6 +836,11 @@ Run in daemon mode with scheduled tasks:
 python angus.py --daemon
 ```
 
+Run the web UI for Sonoteller analysis:
+```bash
+python angus.py --web --port 8080
+```
+
 ## Run Scripts
 
 ### run_angus.bat (Windows)
@@ -712,12 +857,14 @@ run_angus.bat [command] [options]
 - `upload`: Upload pending songs to YouTube
 - `comments`: Fetch comments for uploaded videos
 - `daemon`: Run in daemon mode with scheduled tasks
+- `web`: Run the web UI for Sonoteller analysis
 - `test`: Run tests in simulation mode
 - `help`: Show help message
 
 **Options**:
 - `--limit N`: Limit the number of items to process (default: 10)
 - `--simulate`: Run in simulation mode without making actual API calls
+- `--port N`: Port for the web UI (default: 5000)
 
 **Examples**:
 ```batch
@@ -740,15 +887,18 @@ Shell script to run Agent Angus with common commands.
 - `upload`: Upload pending songs to YouTube
 - `comments`: Fetch comments for uploaded videos
 - `daemon`: Run in daemon mode with scheduled tasks
+- `web`: Run the web UI for Sonoteller analysis
 - `test`: Run tests in simulation mode
 - `help`: Show help message
 
 **Options**:
 - `--limit N`: Limit the number of items to process (default: 10)
 - `--simulate`: Run in simulation mode without making actual API calls
+- `--port N`: Port for the web UI (default: 5000)
 
 **Examples**:
 ```bash
 ./run_angus.sh setup
 ./run_angus.sh upload --limit 5
 ./run_angus.sh comments --limit 10
+./run_angus.sh web --port 8080

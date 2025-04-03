@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Angus - Sonoteller Analysis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            display: none;
+        }
+        .loading {
+            display: none;
+            margin-top: 10px;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+        .analysis-section {
+            margin-top: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .analysis-section h3 {
+            margin-bottom: 5px;
+        }
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .tag {
+            background-color: #f0f0f0;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Agent Angus - Sonoteller Analysis</h1>
+    
+    <div class="form-group">
+        <label for="music-url">Influence Music URL:</label>
+        <input type="text" id="music-url" placeholder="Enter YouTube URL or direct link to .mp3 file">
+    </div>
+    
+    <button id="analyze-btn">Analyze Influence Track</button>
+    
+    <div class="loading" id="loading">
+        Analyzing music... This may take a moment.
+    </div>
+    
+    <div class="error" id="error"></div>
+    
+    <div id="result">
+        <h2>Analysis Results</h2>
+        <div id="analysis-content"></div>
+        <h3>Raw JSON:</h3>
+        <pre id="analysis-json"></pre>
+    </div>
+    
+    <script>
+        document.getElementById('analyze-btn').addEventListener('click', async () => {
+            const url = document.getElementById('music-url').value.trim();
+            
+            if (!url) {
+                showError('Please enter a URL');
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError(data.error, data.details, data.raw_response);
+                    return;
+                }
+                
+                // Format and display the results
+                formatAnalysisResults(data.analysis);
+                
+                // Also display the raw JSON
+                document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
+                document.getElementById('result').style.display = 'block';
+                
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('An error occurred: ' + error.message);
+            }
+        });
+        
+        function formatAnalysisResults(analysis) {
+            const contentElement = document.getElementById('analysis-content');
+            contentElement.innerHTML = '';
+            
+            // Language
+            if (analysis.language) {
+                const langSection = document.createElement('div');
+                langSection.className = 'analysis-section';
+                langSection.innerHTML = `
+                    <h3>Language</h3>
+                    <p>${analysis.language} (${analysis['language-iso'] || ''})</p>
+                `;
+                contentElement.appendChild(langSection);
+            }
+            
+            // Summary
+            if (analysis.summary) {
+                const summarySection = document.createElement('div');
+                summarySection.className = 'analysis-section';
+                summarySection.innerHTML = `
+                    <h3>Summary</h3>
+                    <p>${analysis.summary}</p>
+                `;
+                contentElement.appendChild(summarySection);
+            }
+            
+            // Explicit
+            if (analysis.explicit) {
+                const explicitSection = document.createElement('div');
+                explicitSection.className = 'analysis-section';
+                explicitSection.innerHTML = `
+                    <h3>Explicit Content</h3>
+                    <p>${analysis.explicit}</p>
+                `;
+                contentElement.appendChild(explicitSection);
+            }
+            
+            // Keywords
+            if (analysis.keywords && Object.keys(analysis.keywords).length > 0) {
+                const keywordsSection = document.createElement('div');
+                keywordsSection.className = 'analysis-section';
+                keywordsSection.innerHTML = '<h3>Keywords</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                Object.values(analysis.keywords).forEach(keyword => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    tag.textContent = keyword;
+                    tagList.appendChild(tag);
+                });
+                
+                keywordsSection.appendChild(tagList);
+                contentElement.appendChild(keywordsSection);
+            }
+            
+            // DDEX Moods
+            if (analysis['ddex moods'] && Object.keys(analysis['ddex moods']).length > 0) {
+                const moodsSection = document.createElement('div');
+                moodsSection.className = 'analysis-section';
+                moodsSection.innerHTML = '<h3>Moods</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                Object.values(analysis['ddex moods']).forEach(mood => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    tag.textContent = mood;
+                    tagList.appendChild(tag);
+                });
+                
+                moodsSection.appendChild(tagList);
+                contentElement.appendChild(moodsSection);
+            }
+            
+            // DDEX Themes
+            if (analysis['ddex themes'] && Object.keys(analysis['ddex themes']).length > 0) {
+                const themesSection = document.createElement('div');
+                themesSection.className = 'analysis-section';
+                themesSection.innerHTML = '<h3>Themes</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                Object.values(analysis['ddex themes']).forEach(theme => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    tag.textContent = theme;
+                    tagList.appendChild(tag);
+                });
+                
+                themesSection.appendChild(tagList);
+                contentElement.appendChild(themesSection);
+            }
+            
+            // Flags
+            if (analysis.flags) {
+                const flagsSection = document.createElement('div');
+                flagsSection.className = 'analysis-section';
+                flagsSection.innerHTML = `
+                    <h3>Content Flags</h3>
+                    <ul>
+                        <li>Explicit Language: ${analysis.flags.explicit_language ? 'Yes' : 'No'}</li>
+                        <li>Sexual Innuendo: ${analysis.flags.sexual_innuendo ? 'Yes' : 'No'}</li>
+                        <li>Alcohol/Drugs: ${analysis.flags.alcohol_drugs ? 'Yes' : 'No'}</li>
+                        <li>Hate/Harassment: ${analysis.flags.hate_harassment ? 'Yes' : 'No'}</li>
+                        <li>Violence: ${analysis.flags.violence ? 'Yes' : 'No'}</li>
+                    </ul>
+                `;
+                contentElement.appendChild(flagsSection);
+            }
+        }
+        
+        function showError(message, details = '', rawResponse = '') {
+            const errorElement = document.getElementById('error');
+            
+            // Create error message with details if available
+            let errorHTML = `<strong>${message}</strong>`;
+            
+            if (details) {
+                errorHTML += `<br><small>Details: ${details}</small>`;
+            }
+            
+            if (rawResponse) {
+                errorHTML += `<br><small>API Response: ${rawResponse}</small>`;
+            }
+            
+            errorElement.innerHTML = errorHTML;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
