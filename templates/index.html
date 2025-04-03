@@ -111,7 +111,8 @@
             document.getElementById('result').style.display = 'none';
             
             try {
-                const response = await fetch('/analyze', {
+                // Use a relative path that works with any base URL
+                const response = await fetch('./analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
