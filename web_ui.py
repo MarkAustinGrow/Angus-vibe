@@ -122,6 +122,43 @@ def upload_file():
         'url': file_url
     })
 
+@app.route('/save_parsed_analysis', methods=['POST'])
+def save_parsed_analysis():
+    """Save parsed Sonoteller analysis to the database."""
+    data = request.json
+    analysis = data.get('analysis')
+    
+    if not analysis:
+        return jsonify({'error': 'No analysis provided'}), 400
+    
+    # Create a dummy URL if none is provided
+    url = data.get('url', 'https://sonoteller.com/manual_input')
+    
+    # Store the analysis in Supabase
+    influence_data = {
+        'url': url,
+        'analysis': analysis
+    }
+    
+    # If a song_id was provided, associate the analysis with that song
+    song_id = data.get('song_id')
+    if song_id:
+        influence_data['song_id'] = song_id
+    
+    # Store in Supabase
+    try:
+        response = supabase.client.table("influence_music").insert(influence_data).execute()
+        if response.data and len(response.data) > 0:
+            influence_id = response.data[0].get('id')
+            logger.info(f"Stored parsed analysis with ID: {influence_id}")
+            return jsonify({'success': True, 'id': influence_id})
+        else:
+            logger.error("No data returned from Supabase insert operation")
+            return jsonify({'error': 'Failed to store analysis'}), 500
+    except Exception as e:
+        logger.error(f"Error storing analysis: {str(e)}")
+        return jsonify({'error': f'Failed to store analysis: {str(e)}'}), 500
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """Analyze a music file using Sonoteller API."""

@@ -160,6 +160,7 @@
     
     <button id="analyze-btn">Analyze Influence Track</button>
     <button id="parse-btn">Parse Pasted Analysis</button>
+    <button id="save-btn" style="display: none;">Save to Database</button>
     
     <div class="loading" id="loading">
         Analyzing music... This may take a moment.
@@ -273,6 +274,9 @@
             }
         }
         
+        // Global variable to store the current analysis
+        let currentAnalysis = null;
+        
         // Parse button click handler
         document.getElementById('parse-btn').addEventListener('click', () => {
             const analysisText = document.getElementById('analysis-text').value.trim();
@@ -286,6 +290,9 @@
                 // Parse the pasted analysis text
                 const parsedAnalysis = parseAnalysisText(analysisText);
                 
+                // Store the parsed analysis in the global variable
+                currentAnalysis = parsedAnalysis;
+                
                 // Hide any previous errors
                 document.getElementById('error').style.display = 'none';
                 
@@ -296,8 +303,66 @@
                 document.getElementById('analysis-json').textContent = JSON.stringify(parsedAnalysis, null, 2);
                 document.getElementById('result').style.display = 'block';
                 
+                // Show the Save to Database button
+                document.getElementById('save-btn').style.display = 'inline-block';
+                
             } catch (error) {
                 showError('Failed to parse analysis text: ' + error.message);
+            }
+        });
+        
+        // Save to Database button click handler
+        document.getElementById('save-btn').addEventListener('click', async () => {
+            if (!currentAnalysis) {
+                showError('No analysis to save. Please parse the analysis text first.');
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Saving to database...';
+            document.getElementById('error').style.display = 'none';
+            
+            try {
+                // Send the parsed analysis to the server
+                const response = await fetch('./save_parsed_analysis', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        analysis: currentAnalysis
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError('Failed to save analysis: ' + data.error);
+                    return;
+                }
+                
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.style.color = 'green';
+                successMessage.style.marginTop = '10px';
+                successMessage.innerHTML = `<strong>Analysis saved successfully with ID: ${data.id}</strong>`;
+                
+                // Insert the success message after the Save button
+                const saveBtn = document.getElementById('save-btn');
+                saveBtn.parentNode.insertBefore(successMessage, saveBtn.nextSibling);
+                
+                // Hide the success message after 5 seconds
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 5000);
+                
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('An error occurred while saving: ' + error.message);
             }
         });
         
