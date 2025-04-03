@@ -82,14 +82,14 @@ class SonotellerClient:
         # Create connection to Sonoteller API
         conn = http.client.HTTPSConnection(self.host)
         
-        # URL encode the file parameter
-        encoded_url = urllib.parse.quote(file_url)
-        payload = f"file={encoded_url}"
+        # Create JSON payload as per documentation
+        payload_data = {"file": file_url}
+        payload = json.dumps(payload_data)
         
         headers = {
             'x-rapidapi-key': self.api_key,
             'x-rapidapi-host': self.host,
-            'Content-Type': "application/x-www-form-urlencoded"
+            'Content-Type': "application/json"
         }
         
         # Validate endpoint
