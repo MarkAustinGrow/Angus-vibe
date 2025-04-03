@@ -1,65 +1,84 @@
 """
-Test script for the Sonoteller API.
+Test script for the Sonoteller API client.
 """
-import http.client
 import json
-import urllib.parse
+import argparse
+import logging
+from sonoteller_client import SonotellerClient
+from config import SONOTELLER_API_KEY
 
-def test_sonoteller_api():
-    """Test the Sonoteller API with a sample MP3 URL."""
-    # Sample MP3 URL
-    file_url = "https://storage.googleapis.com/musikame-files/thefatrat-mayday-feat-laura-brehm-lyriclyrics-videocopyright-free-music.mp3"
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def test_sonoteller_client(file_url=None, use_direct_api=False):
+    """
+    Test the Sonoteller client with a sample MP3 URL or a provided URL.
     
-    # API credentials
-    api_key = "58fafc6204msh41ac38769729b59p17fbc3jsneeebeb330eb2"
-    host = "sonoteller-ai1.p.rapidapi.com"
+    Args:
+        file_url: Optional URL to a music file. If not provided, a sample URL will be used.
+        use_direct_api: If True, test the API directly without using the client class.
+    """
+    # Use provided URL or default to sample MP3
+    if not file_url:
+        file_url = "https://storage.googleapis.com/musikame-files/thefatrat-mayday-feat-laura-brehm-lyriclyrics-videocopyright-free-music.mp3"
     
+    print(f"Testing Sonoteller API with file URL: {file_url}")
+    
+    # Create Sonoteller client
+    client = SonotellerClient(SONOTELLER_API_KEY)
+    
+    # Test the client
     try:
-        # Create connection
-        conn = http.client.HTTPSConnection(host)
+        print("Sending request to Sonoteller API...")
+        result = client.analyze_music(file_url)
         
-        # URL encode the file parameter
-        encoded_url = urllib.parse.quote(file_url)
-        payload = f"file={encoded_url}"
-        
-        # Set headers
-        headers = {
-            'x-rapidapi-key': api_key,
-            'x-rapidapi-host': host,
-            'Content-Type': "application/x-www-form-urlencoded"
-        }
-        
-        # Make request
-        print(f"Sending request to {host}/lyrics_ddex with payload: {payload}")
-        conn.request("POST", "/lyrics_ddex", payload, headers)
-        
-        # Get response
-        res = conn.getresponse()
-        data = res.read()
-        
-        # Print response status
-        print(f"Response status: {res.status} {res.reason}")
-        
-        # Print response headers
-        print("Response headers:")
-        for header in res.getheaders():
-            print(f"  {header[0]}: {header[1]}")
-        
-        # Print response data
-        response_text = data.decode("utf-8")
-        print(f"Response data (first 500 chars):")
-        print(response_text[:500])
-        
-        # Try to parse as JSON
-        try:
-            result = json.loads(response_text)
-            print("Successfully parsed response as JSON")
-            print(json.dumps(result, indent=2))
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse response as JSON: {str(e)}")
-        
+        if result:
+            if "error" in result:
+                print(f"Error from API: {result['error']}")
+                if "details" in result:
+                    print(f"Details: {result['details']}")
+                if "raw_response" in result:
+                    print(f"Raw response: {result['raw_response']}")
+            else:
+                print("Successfully received and parsed response")
+                print(json.dumps(result, indent=2))
+                
+                # Print key information
+                if "language" in result:
+                    print(f"\nLanguage: {result['language']}")
+                if "summary" in result:
+                    print(f"\nSummary: {result['summary']}")
+                if "ddex moods" in result:
+                    # Handle both list and dictionary formats
+                    if isinstance(result['ddex moods'], list):
+                        print(f"\nMoods: {', '.join(result['ddex moods'])}")
+                    else:
+                        print(f"\nMoods: {', '.join(result['ddex moods'].values())}")
+                if "ddex themes" in result:
+                    # Handle both list and dictionary formats
+                    if isinstance(result['ddex themes'], list):
+                        print(f"\nThemes: {', '.join(result['ddex themes'])}")
+                    else:
+                        print(f"\nThemes: {', '.join(result['ddex themes'].values())}")
+                if "keywords" in result:
+                    # Handle both list and dictionary formats
+                    if isinstance(result['keywords'], list):
+                        print(f"\nKeywords: {', '.join(result['keywords'])}")
+                    else:
+                        print(f"\nKeywords: {', '.join(result['keywords'].values())}")
+        else:
+            print("No result returned from API")
+            
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error testing Sonoteller client: {str(e)}")
 
 if __name__ == "__main__":
-    test_sonoteller_api()
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Test the Sonoteller API client")
+    parser.add_argument("--url", help="URL of the music file to analyze")
+    parser.add_argument("--direct", action="store_true", help="Test the API directly without using the client class")
+    args = parser.parse_args()
+    
+    # Run the test
+    test_sonoteller_client(args.url, args.direct)

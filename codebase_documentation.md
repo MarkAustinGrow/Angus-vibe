@@ -612,14 +612,43 @@ analysis = sonoteller.analyze_music("https://example.com/song.mp3")
 if analysis:
     print(f"Language: {analysis.get('language')}")
     print(f"Summary: {analysis.get('summary')}")
+    
+    # Handle both list and dictionary formats for moods
+    if isinstance(analysis.get('ddex moods'), list):
+        print(f"Moods: {', '.join(analysis['ddex moods'])}")
+    else:
+        print(f"Moods: {', '.join(analysis['ddex moods'].values())}")
 else:
     print("Failed to analyze music")
 ```
 
 **Error Handling**:
 - Handles YouTube URLs by using a sample MP3 for testing
+- Makes HTTP requests to the Sonoteller API endpoint (/lyrics_ddex)
+- Properly handles API response status codes and error messages
 - Returns detailed error information if the API call fails
-- Provides a mock response for testing when the API is unavailable
+- Provides a mock response as a fallback when the API call fails
+
+##### Method: `_get_mock_response`
+
+```python
+def _get_mock_response(self) -> Dict[str, Any]
+```
+
+**Description**: Returns a mock response for testing or fallback purposes.
+
+**Parameters**: None
+
+**Returns**:
+- `Dict[str, Any]`: Dictionary with mock analysis results
+
+**Example**:
+```python
+# Used internally when API calls fail
+mock_response = sonoteller._get_mock_response()
+```
+
+**Note**: The mock response follows the same format as the actual API response, with keywords, moods, and themes as lists rather than dictionaries with numeric keys.
 
 ### 6. Web UI (web_ui.py)
 
@@ -767,6 +796,41 @@ Tests running Angus on a specific video.
 ```bash
 python test_angus_specific_video.py --video-id VIDEO_ID
 ```
+
+### test_sonoteller.py
+
+Tests the Sonoteller API client with a sample MP3 URL or a provided URL.
+
+**Usage**:
+```bash
+python test_sonoteller.py [--url URL]
+```
+
+**Parameters**:
+- `--url`: Optional URL to a music file. If not provided, a sample URL will be used.
+
+**Description**:
+This script tests the SonotellerClient by sending a request to the Sonoteller API and displaying the analysis results. It handles both the actual API response and fallback to mock responses if the API call fails. The script is designed to work with both list and dictionary formats for keywords, moods, and themes in the API response.
+
+**Example**:
+```bash
+# Test with the default sample MP3
+python test_sonoteller.py
+
+# Test with a specific MP3 URL
+python test_sonoteller.py --url https://example.com/song.mp3
+
+# Test with a YouTube URL (will use a sample MP3 for testing)
+python test_sonoteller.py --url https://www.youtube.com/watch?v=VIDEO_ID
+```
+
+**Output**:
+The script outputs the full JSON response from the API, as well as formatted key information such as:
+- Language
+- Summary
+- Moods
+- Themes
+- Keywords
 
 ### Influence Music Table
 

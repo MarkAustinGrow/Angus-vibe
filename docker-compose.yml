@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 services:
   angus:
@@ -13,3 +13,15 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    command: python angus.py --daemon
+
+  web:
+    build: .
+    restart: always
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    ports:
+      - "8080:5000"
+    command: python angus.py --web

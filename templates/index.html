@@ -181,7 +181,7 @@
             }
             
             // Keywords
-            if (analysis.keywords && Object.keys(analysis.keywords).length > 0) {
+            if (analysis.keywords) {
                 const keywordsSection = document.createElement('div');
                 keywordsSection.className = 'analysis-section';
                 keywordsSection.innerHTML = '<h3>Keywords</h3>';
@@ -189,7 +189,12 @@
                 const tagList = document.createElement('div');
                 tagList.className = 'tag-list';
                 
-                Object.values(analysis.keywords).forEach(keyword => {
+                // Handle both array and object formats
+                const keywordValues = Array.isArray(analysis.keywords) 
+                    ? analysis.keywords 
+                    : Object.values(analysis.keywords);
+                
+                keywordValues.forEach(keyword => {
                     const tag = document.createElement('span');
                     tag.className = 'tag';
                     tag.textContent = keyword;
@@ -201,7 +206,7 @@
             }
             
             // DDEX Moods
-            if (analysis['ddex moods'] && Object.keys(analysis['ddex moods']).length > 0) {
+            if (analysis['ddex moods']) {
                 const moodsSection = document.createElement('div');
                 moodsSection.className = 'analysis-section';
                 moodsSection.innerHTML = '<h3>Moods</h3>';
@@ -209,7 +214,12 @@
                 const tagList = document.createElement('div');
                 tagList.className = 'tag-list';
                 
-                Object.values(analysis['ddex moods']).forEach(mood => {
+                // Handle both array and object formats
+                const moodValues = Array.isArray(analysis['ddex moods']) 
+                    ? analysis['ddex moods'] 
+                    : Object.values(analysis['ddex moods']);
+                
+                moodValues.forEach(mood => {
                     const tag = document.createElement('span');
                     tag.className = 'tag';
                     tag.textContent = mood;
@@ -221,7 +231,7 @@
             }
             
             // DDEX Themes
-            if (analysis['ddex themes'] && Object.keys(analysis['ddex themes']).length > 0) {
+            if (analysis['ddex themes']) {
                 const themesSection = document.createElement('div');
                 themesSection.className = 'analysis-section';
                 themesSection.innerHTML = '<h3>Themes</h3>';
@@ -229,7 +239,12 @@
                 const tagList = document.createElement('div');
                 tagList.className = 'tag-list';
                 
-                Object.values(analysis['ddex themes']).forEach(theme => {
+                // Handle both array and object formats
+                const themeValues = Array.isArray(analysis['ddex themes']) 
+                    ? analysis['ddex themes'] 
+                    : Object.values(analysis['ddex themes']);
+                
+                themeValues.forEach(theme => {
                     const tag = document.createElement('span');
                     tag.className = 'tag';
                     tag.textContent = theme;
