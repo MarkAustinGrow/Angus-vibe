@@ -33,7 +33,7 @@ sonoteller = SonotellerClient(SONOTELLER_API_KEY)
 # Configure upload settings
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'mp3'}
-MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max upload size
+MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB max upload size
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 

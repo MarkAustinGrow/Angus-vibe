@@ -16,12 +16,15 @@ services:
     command: python angus.py --daemon
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     restart: always
     volumes:
       - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./templates:/app/templates
     env_file:
       - .env
     ports:
       - "8080:5000"
-    command: python angus.py --web

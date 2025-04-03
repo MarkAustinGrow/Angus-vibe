@@ -1,0 +1,21 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install Flask==2.0.1 Werkzeug==2.0.1
+
+# Copy application code
+COPY . .
+
+# Create directories for persistent storage
+RUN mkdir -p /app/data
+RUN mkdir -p /app/uploads
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Run the web UI directly
+CMD ["python", "run_web_ui.py"]
