@@ -139,6 +139,14 @@
         <input type="text" id="music-url" placeholder="Enter direct link to .mp3 file">
         <small class="text-muted">Only direct MP3 URLs are supported.</small>
     </div>
+
+    <div class="url-or">OR</div>
+    
+    <div class="form-group">
+        <label for="analysis-text">Paste Sonoteller Analysis:</label>
+        <textarea id="analysis-text" rows="10" style="width: 100%; padding: 8px;" placeholder="Paste the analysis text from Sonoteller website here..."></textarea>
+        <small class="text-muted">Paste the complete analysis text including LYRICS ANALYSIS and MUSIC ANALYSIS sections.</small>
+    </div>
     
     <div class="form-group">
         <label for="endpoint">Analysis Type:</label>
@@ -151,6 +159,7 @@
     </div>
     
     <button id="analyze-btn">Analyze Influence Track</button>
+    <button id="parse-btn">Parse Pasted Analysis</button>
     
     <div class="loading" id="loading">
         Analyzing music... This may take a moment.
@@ -264,6 +273,163 @@
             }
         }
         
+        // Parse button click handler
+        document.getElementById('parse-btn').addEventListener('click', () => {
+            const analysisText = document.getElementById('analysis-text').value.trim();
+            
+            if (!analysisText) {
+                showError('Please paste the analysis text first');
+                return;
+            }
+            
+            try {
+                // Parse the pasted analysis text
+                const parsedAnalysis = parseAnalysisText(analysisText);
+                
+                // Hide any previous errors
+                document.getElementById('error').style.display = 'none';
+                
+                // Format and display the results
+                formatAnalysisResults(parsedAnalysis);
+                
+                // Also display the raw JSON
+                document.getElementById('analysis-json').textContent = JSON.stringify(parsedAnalysis, null, 2);
+                document.getElementById('result').style.display = 'block';
+                
+            } catch (error) {
+                showError('Failed to parse analysis text: ' + error.message);
+            }
+        });
+        
+        // Function to parse the pasted analysis text
+        function parseAnalysisText(text) {
+            const analysis = {};
+            
+            // Split into LYRICS ANALYSIS and MUSIC ANALYSIS sections
+            const lyricsMatch = text.match(/LYRICS ANALYSIS([\s\S]*?)(?=MUSIC ANALYSIS|$)/i);
+            const musicMatch = text.match(/MUSIC ANALYSIS([\s\S]*?)$/i);
+            
+            if (lyricsMatch) {
+                const lyricsSection = lyricsMatch[1].trim();
+                
+                // Extract Summary
+                const summaryMatch = lyricsSection.match(/Summary\s*([\s\S]*?)(?=Moods|$)/i);
+                if (summaryMatch) {
+                    analysis.summary = summaryMatch[1].trim();
+                }
+                
+                // Extract Moods
+                const moodsMatch = lyricsSection.match(/Moods\s*([\s\S]*?)(?=Themes|$)/i);
+                if (moodsMatch) {
+                    const moodsText = moodsMatch[1].trim();
+                    const moodsList = moodsText.split(/,\s*/).map(item => {
+                        const parts = item.match(/([^(]+)\s*\((\d+)\)/);
+                        return parts ? { name: parts[1].trim(), score: parseInt(parts[2]) } : item.trim();
+                    });
+                    analysis.moods = moodsList;
+                }
+                
+                // Extract Themes
+                const themesMatch = lyricsSection.match(/Themes\s*([\s\S]*?)(?=Language|$)/i);
+                if (themesMatch) {
+                    const themesText = themesMatch[1].trim();
+                    const themesList = themesText.split(/,\s*/).map(item => {
+                        const parts = item.match(/([^(]+)\s*\((\d+)\)/);
+                        return parts ? { name: parts[1].trim(), score: parseInt(parts[2]) } : item.trim();
+                    });
+                    analysis.themes = themesList;
+                }
+                
+                // Extract Language
+                const languageMatch = lyricsSection.match(/Language\s*([\s\S]*?)(?=Explicit|$)/i);
+                if (languageMatch) {
+                    analysis.language = languageMatch[1].trim();
+                }
+                
+                // Extract Explicit
+                const explicitMatch = lyricsSection.match(/Explicit\s*([\s\S]*?)$/i);
+                if (explicitMatch) {
+                    analysis.explicit = explicitMatch[1].trim();
+                }
+            }
+            
+            if (musicMatch) {
+                const musicSection = musicMatch[1].trim();
+                
+                // Extract Genres
+                const genresMatch = musicSection.match(/Genres\s*([\s\S]*?)(?=Subgenres|$)/i);
+                if (genresMatch) {
+                    const genresText = genresMatch[1].trim();
+                    const genresList = genresText.split(/,\s*/).map(item => {
+                        const parts = item.match(/([^(]+)\s*\((\d+)\)/);
+                        return parts ? { name: parts[1].trim(), score: parseInt(parts[2]) } : item.trim();
+                    });
+                    analysis.genres = genresList;
+                }
+                
+                // Extract Subgenres
+                const subgenresMatch = musicSection.match(/Subgenres\s*([\s\S]*?)(?=Moods|$)/i);
+                if (subgenresMatch) {
+                    const subgenresText = subgenresMatch[1].trim();
+                    const subgenresList = subgenresText.split(/,\s*/).map(item => {
+                        const parts = item.match(/([^(]+)\s*\((\d+)\)/);
+                        return parts ? { name: parts[1].trim(), score: parseInt(parts[2]) } : item.trim();
+                    });
+                    analysis.subgenres = subgenresList;
+                }
+                
+                // Extract Music Moods
+                const musicMoodsMatch = musicSection.match(/Moods\s*([\s\S]*?)(?=Instruments|$)/i);
+                if (musicMoodsMatch) {
+                    const moodsText = musicMoodsMatch[1].trim();
+                    const moodsList = moodsText.split(/,\s*/).map(item => {
+                        const parts = item.match(/([^(]+)\s*\((\d+)\)/);
+                        return parts ? { name: parts[1].trim(), score: parseInt(parts[2]) } : item.trim();
+                    });
+                    analysis.music_moods = moodsList;
+                }
+                
+                // Extract Instruments
+                const instrumentsMatch = musicSection.match(/Instruments\s*([\s\S]*?)(?=BPM & Key|$)/i);
+                if (instrumentsMatch) {
+                    const instrumentsText = instrumentsMatch[1].trim();
+                    analysis.instruments = instrumentsText.split(/,\s*/).map(item => item.trim());
+                }
+                
+                // Extract BPM & Key
+                const bpmKeyMatch = musicSection.match(/BPM & Key\s*([\s\S]*?)(?=Vocals|$)/i);
+                if (bpmKeyMatch) {
+                    const bpmKeyText = bpmKeyMatch[1].trim();
+                    const bpmMatch = bpmKeyText.match(/(\d+\.?\d*)BPM/);
+                    if (bpmMatch) {
+                        analysis.bpm = parseFloat(bpmMatch[1]);
+                    }
+                    
+                    const keyMatch = bpmKeyText.match(/BPM,\s*([^,]+)/);
+                    if (keyMatch) {
+                        analysis.key = keyMatch[1].trim();
+                    }
+                }
+                
+                // Extract Vocals
+                const vocalsMatch = musicSection.match(/Vocals\s*([\s\S]*?)$/i);
+                if (vocalsMatch) {
+                    analysis.vocals = vocalsMatch[1].trim();
+                }
+            }
+            
+            // Convert to DDEX format for compatibility with the existing display code
+            analysis['ddex moods'] = analysis.moods ? analysis.moods.map(mood => 
+                typeof mood === 'object' ? mood.name : mood
+            ) : [];
+            
+            analysis['ddex themes'] = analysis.themes ? analysis.themes.map(theme => 
+                typeof theme === 'object' ? theme.name : theme
+            ) : [];
+            
+            return analysis;
+        }
+        
         // Analyze button click handler
         analyzeBtn.addEventListener('click', async () => {
             const url = musicUrlInput.value.trim();
@@ -325,13 +491,19 @@
             const contentElement = document.getElementById('analysis-content');
             contentElement.innerHTML = '';
             
+            // Create a section for Lyrics Analysis
+            const lyricsSection = document.createElement('div');
+            lyricsSection.className = 'analysis-section';
+            lyricsSection.innerHTML = '<h2>Lyrics Analysis</h2>';
+            contentElement.appendChild(lyricsSection);
+            
             // Language
             if (analysis.language) {
                 const langSection = document.createElement('div');
                 langSection.className = 'analysis-section';
                 langSection.innerHTML = `
                     <h3>Language</h3>
-                    <p>${analysis.language} (${analysis['language-iso'] || ''})</p>
+                    <p>${analysis.language} ${analysis['language-iso'] ? `(${analysis['language-iso']})` : ''}</p>
                 `;
                 contentElement.appendChild(langSection);
             }
@@ -358,33 +530,29 @@
                 contentElement.appendChild(explicitSection);
             }
             
-            // Keywords
-            if (analysis.keywords) {
-                const keywordsSection = document.createElement('div');
-                keywordsSection.className = 'analysis-section';
-                keywordsSection.innerHTML = '<h3>Keywords</h3>';
+            // Lyrics Moods
+            if (analysis.moods && analysis.moods.length > 0) {
+                const moodsSection = document.createElement('div');
+                moodsSection.className = 'analysis-section';
+                moodsSection.innerHTML = '<h3>Moods</h3>';
                 
                 const tagList = document.createElement('div');
                 tagList.className = 'tag-list';
                 
-                // Handle both array and object formats
-                const keywordValues = Array.isArray(analysis.keywords) 
-                    ? analysis.keywords 
-                    : Object.values(analysis.keywords);
-                
-                keywordValues.forEach(keyword => {
+                analysis.moods.forEach(mood => {
                     const tag = document.createElement('span');
                     tag.className = 'tag';
-                    tag.textContent = keyword;
+                    if (typeof mood === 'object') {
+                        tag.textContent = `${mood.name} (${mood.score})`;
+                    } else {
+                        tag.textContent = mood;
+                    }
                     tagList.appendChild(tag);
                 });
                 
-                keywordsSection.appendChild(tagList);
-                contentElement.appendChild(keywordsSection);
-            }
-            
-            // DDEX Moods
-            if (analysis['ddex moods']) {
+                moodsSection.appendChild(tagList);
+                contentElement.appendChild(moodsSection);
+            } else if (analysis['ddex moods']) {
                 const moodsSection = document.createElement('div');
                 moodsSection.className = 'analysis-section';
                 moodsSection.innerHTML = '<h3>Moods</h3>';
@@ -408,8 +576,29 @@
                 contentElement.appendChild(moodsSection);
             }
             
-            // DDEX Themes
-            if (analysis['ddex themes']) {
+            // Themes
+            if (analysis.themes && analysis.themes.length > 0) {
+                const themesSection = document.createElement('div');
+                themesSection.className = 'analysis-section';
+                themesSection.innerHTML = '<h3>Themes</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                analysis.themes.forEach(theme => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    if (typeof theme === 'object') {
+                        tag.textContent = `${theme.name} (${theme.score})`;
+                    } else {
+                        tag.textContent = theme;
+                    }
+                    tagList.appendChild(tag);
+                });
+                
+                themesSection.appendChild(tagList);
+                contentElement.appendChild(themesSection);
+            } else if (analysis['ddex themes']) {
                 const themesSection = document.createElement('div');
                 themesSection.className = 'analysis-section';
                 themesSection.innerHTML = '<h3>Themes</h3>';
@@ -431,6 +620,142 @@
                 
                 themesSection.appendChild(tagList);
                 contentElement.appendChild(themesSection);
+            }
+            
+            // Create a section for Music Analysis
+            const musicSection = document.createElement('div');
+            musicSection.className = 'analysis-section';
+            musicSection.innerHTML = '<h2>Music Analysis</h2>';
+            contentElement.appendChild(musicSection);
+            
+            // Genres
+            if (analysis.genres && analysis.genres.length > 0) {
+                const genresSection = document.createElement('div');
+                genresSection.className = 'analysis-section';
+                genresSection.innerHTML = '<h3>Genres</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                analysis.genres.forEach(genre => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    if (typeof genre === 'object') {
+                        tag.textContent = `${genre.name} (${genre.score})`;
+                    } else {
+                        tag.textContent = genre;
+                    }
+                    tagList.appendChild(tag);
+                });
+                
+                genresSection.appendChild(tagList);
+                contentElement.appendChild(genresSection);
+            }
+            
+            // Subgenres
+            if (analysis.subgenres && analysis.subgenres.length > 0) {
+                const subgenresSection = document.createElement('div');
+                subgenresSection.className = 'analysis-section';
+                subgenresSection.innerHTML = '<h3>Subgenres</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                analysis.subgenres.forEach(subgenre => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    if (typeof subgenre === 'object') {
+                        tag.textContent = `${subgenre.name} (${subgenre.score})`;
+                    } else {
+                        tag.textContent = subgenre;
+                    }
+                    tagList.appendChild(tag);
+                });
+                
+                subgenresSection.appendChild(tagList);
+                contentElement.appendChild(subgenresSection);
+            }
+            
+            // Music Moods
+            if (analysis.music_moods && analysis.music_moods.length > 0) {
+                const musicMoodsSection = document.createElement('div');
+                musicMoodsSection.className = 'analysis-section';
+                musicMoodsSection.innerHTML = '<h3>Music Moods</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                analysis.music_moods.forEach(mood => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    if (typeof mood === 'object') {
+                        tag.textContent = `${mood.name} (${mood.score})`;
+                    } else {
+                        tag.textContent = mood;
+                    }
+                    tagList.appendChild(tag);
+                });
+                
+                musicMoodsSection.appendChild(tagList);
+                contentElement.appendChild(musicMoodsSection);
+            }
+            
+            // Instruments
+            if (analysis.instruments && analysis.instruments.length > 0) {
+                const instrumentsSection = document.createElement('div');
+                instrumentsSection.className = 'analysis-section';
+                instrumentsSection.innerHTML = `
+                    <h3>Instruments</h3>
+                    <p>${analysis.instruments.join(', ')}</p>
+                `;
+                contentElement.appendChild(instrumentsSection);
+            }
+            
+            // BPM & Key
+            if (analysis.bpm || analysis.key) {
+                const bpmKeySection = document.createElement('div');
+                bpmKeySection.className = 'analysis-section';
+                bpmKeySection.innerHTML = `
+                    <h3>BPM & Key</h3>
+                    <p>${analysis.bpm ? analysis.bpm + ' BPM' : ''} ${analysis.key ? analysis.key : ''}</p>
+                `;
+                contentElement.appendChild(bpmKeySection);
+            }
+            
+            // Vocals
+            if (analysis.vocals) {
+                const vocalsSection = document.createElement('div');
+                vocalsSection.className = 'analysis-section';
+                vocalsSection.innerHTML = `
+                    <h3>Vocals</h3>
+                    <p>${analysis.vocals}</p>
+                `;
+                contentElement.appendChild(vocalsSection);
+            }
+            
+            // Keywords
+            if (analysis.keywords) {
+                const keywordsSection = document.createElement('div');
+                keywordsSection.className = 'analysis-section';
+                keywordsSection.innerHTML = '<h3>Keywords</h3>';
+                
+                const tagList = document.createElement('div');
+                tagList.className = 'tag-list';
+                
+                // Handle both array and object formats
+                const keywordValues = Array.isArray(analysis.keywords) 
+                    ? analysis.keywords 
+                    : Object.values(analysis.keywords);
+                
+                keywordValues.forEach(keyword => {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag';
+                    tag.textContent = keyword;
+                    tagList.appendChild(tag);
+                });
+                
+                keywordsSection.appendChild(tagList);
+                contentElement.appendChild(keywordsSection);
             }
             
             // Flags
