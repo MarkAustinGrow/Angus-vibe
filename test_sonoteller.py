@@ -11,19 +11,26 @@ from config import SONOTELLER_API_KEY
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_sonoteller_client(file_url=None, use_direct_api=False):
+def test_sonoteller_client(file_url=None, use_direct_api=False, endpoint="lyrics_ddex"):
     """
-    Test the Sonoteller client with a sample MP3 URL or a provided URL.
+    Test the Sonoteller client with a sample MP3 URL.
     
     Args:
         file_url: Optional URL to a music file. If not provided, a sample URL will be used.
         use_direct_api: If True, test the API directly without using the client class.
+        endpoint: API endpoint to use.
     """
     # Use provided URL or default to sample MP3
     if not file_url:
         file_url = "https://storage.googleapis.com/musikame-files/thefatrat-mayday-feat-laura-brehm-lyriclyrics-videocopyright-free-music.mp3"
     
     print(f"Testing Sonoteller API with file URL: {file_url}")
+    print(f"Endpoint: {endpoint}")
+    
+    # Check if it's an MP3 URL
+    if not file_url.lower().endswith('.mp3'):
+        print("Error: Only MP3 URLs are supported.")
+        return
     
     # Create Sonoteller client
     client = SonotellerClient(SONOTELLER_API_KEY)
@@ -31,7 +38,10 @@ def test_sonoteller_client(file_url=None, use_direct_api=False):
     # Test the client
     try:
         print("Sending request to Sonoteller API...")
-        result = client.analyze_music(file_url)
+        result = client.analyze_music(
+            file_url, 
+            endpoint=endpoint
+        )
         
         if result:
             if "error" in result:
@@ -67,6 +77,12 @@ def test_sonoteller_client(file_url=None, use_direct_api=False):
                         print(f"\nKeywords: {', '.join(result['keywords'])}")
                     else:
                         print(f"\nKeywords: {', '.join(result['keywords'].values())}")
+                
+                # Check if this is a real API response or a mock
+                if "error" in result:
+                    print(f"\nERROR: {result['error']}")
+                    if "details" in result:
+                        print(f"Details: {result['details']}")
         else:
             print("No result returned from API")
             
@@ -76,9 +92,16 @@ def test_sonoteller_client(file_url=None, use_direct_api=False):
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Test the Sonoteller API client")
-    parser.add_argument("--url", help="URL of the music file to analyze")
+    parser.add_argument("--url", help="URL of the MP3 file to analyze")
     parser.add_argument("--direct", action="store_true", help="Test the API directly without using the client class")
+    parser.add_argument("--endpoint", default="lyrics_ddex", 
+                       choices=["lyrics_ddex", "music_ddex", "lyrics", "music"], 
+                       help="API endpoint to use")
     args = parser.parse_args()
     
     # Run the test
-    test_sonoteller_client(args.url, args.direct)
+    test_sonoteller_client(
+        args.url, 
+        args.direct,
+        args.endpoint
+    )

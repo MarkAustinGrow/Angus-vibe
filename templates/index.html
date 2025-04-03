@@ -33,6 +33,7 @@
             padding: 10px 15px;
             border: none;
             cursor: pointer;
+            margin-right: 10px;
         }
         button:hover {
             background-color: #45a049;
@@ -71,14 +72,82 @@
             border-radius: 3px;
             font-size: 0.9em;
         }
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .upload-area.dragover {
+            border-color: #4CAF50;
+            background-color: #f8f8f8;
+        }
+        .upload-area p {
+            margin: 0;
+            color: #666;
+        }
+        .upload-progress {
+            height: 5px;
+            width: 0%;
+            background-color: #4CAF50;
+            margin-top: 10px;
+            transition: width 0.3s;
+        }
+        .file-input {
+            display: none;
+        }
+        .url-or {
+            text-align: center;
+            margin: 15px 0;
+            position: relative;
+        }
+        .url-or:before, .url-or:after {
+            content: "";
+            display: block;
+            width: 40%;
+            height: 1px;
+            background: #ddd;
+            position: absolute;
+            top: 50%;
+        }
+        .url-or:before {
+            left: 0;
+        }
+        .url-or:after {
+            right: 0;
+        }
     </style>
 </head>
 <body>
     <h1>Agent Angus - Sonoteller Analysis</h1>
     
     <div class="form-group">
-        <label for="music-url">Influence Music URL:</label>
-        <input type="text" id="music-url" placeholder="Enter YouTube URL or direct link to .mp3 file">
+        <label>Upload MP3 File:</label>
+        <div class="upload-area" id="upload-area">
+            <p>Drag & drop your MP3 file here or click to browse</p>
+            <div class="upload-progress" id="upload-progress"></div>
+        </div>
+        <input type="file" id="file-input" class="file-input" accept=".mp3">
+    </div>
+    
+    <div class="url-or">OR</div>
+    
+    <div class="form-group">
+        <label for="music-url">Enter MP3 URL:</label>
+        <input type="text" id="music-url" placeholder="Enter direct link to .mp3 file">
+        <small class="text-muted">Only direct MP3 URLs are supported.</small>
+    </div>
+    
+    <div class="form-group">
+        <label for="endpoint">Analysis Type:</label>
+        <select id="endpoint" class="form-control">
+            <option value="lyrics_ddex" selected>Lyrics DDEX (Default)</option>
+            <option value="music_ddex">Music DDEX</option>
+            <option value="lyrics">Lyrics</option>
+            <option value="music">Music</option>
+        </select>
     </div>
     
     <button id="analyze-btn">Analyze Influence Track</button>
@@ -97,11 +166,117 @@
     </div>
     
     <script>
-        document.getElementById('analyze-btn').addEventListener('click', async () => {
-            const url = document.getElementById('music-url').value.trim();
+        // File upload handling
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const uploadProgress = document.getElementById('upload-progress');
+        const musicUrlInput = document.getElementById('music-url');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        
+        // Handle file selection via click
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // Handle drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelection();
+            }
+        });
+        
+        // Handle file selection
+        fileInput.addEventListener('change', handleFileSelection);
+        
+        function handleFileSelection() {
+            if (fileInput.files.length === 0) return;
+            
+            const file = fileInput.files[0];
+            
+            // Check if it's an MP3
+            if (!file.name.toLowerCase().endsWith('.mp3')) {
+                showError('Only MP3 files are supported.');
+                return;
+            }
+            
+            // Upload the file
+            uploadFile(file);
+        }
+        
+        async function uploadFile(file) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Show progress
+                uploadProgress.style.width = '0%';
+                uploadProgress.style.display = 'block';
+                
+                const xhr = new XMLHttpRequest();
+                
+                // Track upload progress
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        uploadProgress.style.width = percentComplete + '%';
+                    }
+                });
+                
+                // Handle response
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response.success) {
+                            // Set the URL in the input field
+                            musicUrlInput.value = response.url;
+                            uploadArea.innerHTML = `<p>File uploaded: ${file.name}</p>`;
+                        } else {
+                            showError('Upload failed: ' + (response.error || 'Unknown error'));
+                        }
+                    } else {
+                        showError('Upload failed: ' + xhr.statusText);
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    showError('Upload failed. Please try again.');
+                };
+                
+                // Send the request
+                xhr.open('POST', './upload', true);
+                xhr.send(formData);
+                
+            } catch (error) {
+                showError('Upload failed: ' + error.message);
+            }
+        }
+        
+        // Analyze button click handler
+        analyzeBtn.addEventListener('click', async () => {
+            const url = musicUrlInput.value.trim();
+            const endpoint = document.getElementById('endpoint').value;
             
             if (!url) {
-                showError('Please enter a URL');
+                showError('Please enter a URL or upload a file');
+                return;
+            }
+            
+            // Check if it's an MP3 URL
+            if (!url.toLowerCase().endsWith('.mp3')) {
+                showError('Only MP3 URLs are supported.');
                 return;
             }
             
@@ -117,7 +292,10 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url })
+                    body: JSON.stringify({ 
+                        url,
+                        endpoint
+                    })
                 });
                 
                 const data = await response.json();

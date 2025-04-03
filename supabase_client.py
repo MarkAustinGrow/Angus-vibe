@@ -1,10 +1,10 @@
 """
-Supabase client for interacting with the database.
+Supabase client for interacting with the database and storage.
 """
 import os
 import json
 import logging
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Tuple
 from supabase import create_client
 
 # Import configuration
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class SupabaseClient:
     """
-    Client for interacting with Supabase to store and retrieve song data.
+    Client for interacting with Supabase to store and retrieve data, and manage storage.
     """
     
     def __init__(self, url: Optional[str] = None, key: Optional[str] = None):
@@ -150,3 +150,100 @@ class SupabaseClient:
         except Exception as e:
             logger.error(f"Error listing songs: {str(e)}")
             return []
+    
+    # Storage methods
+    
+    def create_storage_bucket(self, bucket_name: str, is_public: bool = True) -> bool:
+        """
+        Create a storage bucket if it doesn't exist.
+        
+        Args:
+            bucket_name: Name of the bucket to create
+            is_public: Whether the bucket should be public
+            
+        Returns:
+            True if the bucket was created or already exists, False otherwise
+        """
+        logger.info(f"Creating storage bucket: {bucket_name} (public: {is_public})")
+        
+        try:
+            # Check if bucket exists
+            try:
+                self.client.storage.get_bucket(bucket_name)
+                logger.info(f"Bucket already exists: {bucket_name}")
+                return True
+            except Exception:
+                # Bucket doesn't exist, create it
+                pass
+                
+            # Create the bucket
+            self.client.storage.create_bucket(bucket_name)
+            
+            # Set bucket to public if requested
+            if is_public:
+                self.client.storage.update_bucket(bucket_name, {"public": True})
+                
+            logger.info(f"Created storage bucket: {bucket_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating storage bucket: {str(e)}")
+            return False
+    
+    def upload_file_to_storage(self, bucket_name: str, file_path: str, file_name: Optional[str] = None) -> Optional[str]:
+        """
+        Upload a file to a storage bucket.
+        
+        Args:
+            bucket_name: Name of the bucket to upload to
+            file_path: Path to the file to upload
+            file_name: Name to use for the file in storage (defaults to basename of file_path)
+            
+        Returns:
+            Public URL of the uploaded file, or None if upload failed
+        """
+        if not file_name:
+            file_name = os.path.basename(file_path)
+            
+        logger.info(f"Uploading file to storage: {file_path} -> {bucket_name}/{file_name}")
+        
+        try:
+            # Ensure bucket exists
+            if not self.create_storage_bucket(bucket_name):
+                logger.error(f"Failed to create or access bucket: {bucket_name}")
+                return None
+                
+            # Upload the file
+            with open(file_path, 'rb') as f:
+                self.client.storage.from_(bucket_name).upload(file_name, f)
+                
+            # Get the public URL
+            public_url = self.client.storage.from_(bucket_name).get_public_url(file_name)
+            logger.info(f"Uploaded file to storage: {public_url}")
+            return public_url
+            
+        except Exception as e:
+            logger.error(f"Error uploading file to storage: {str(e)}")
+            return None
+    
+    def delete_file_from_storage(self, bucket_name: str, file_name: str) -> bool:
+        """
+        Delete a file from a storage bucket.
+        
+        Args:
+            bucket_name: Name of the bucket containing the file
+            file_name: Name of the file to delete
+            
+        Returns:
+            True if the file was deleted, False otherwise
+        """
+        logger.info(f"Deleting file from storage: {bucket_name}/{file_name}")
+        
+        try:
+            self.client.storage.from_(bucket_name).remove([file_name])
+            logger.info(f"Deleted file from storage: {bucket_name}/{file_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting file from storage: {str(e)}")
+            return False

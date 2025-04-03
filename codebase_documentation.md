@@ -595,20 +595,39 @@ sonoteller = SonotellerClient(SONOTELLER_API_KEY)
 ##### Method: `analyze_music`
 
 ```python
-def analyze_music(self, file_url: str) -> Optional[Dict[str, Any]]
+def analyze_music(self, file_url: str, endpoint: str = "lyrics_ddex", cleanup: bool = True) -> Optional[Dict[str, Any]]
 ```
 
 **Description**: Analyze a music file using the Sonoteller API.
 
 **Parameters**:
-- `file_url` (str): URL of the music file to analyze (.mp3) or YouTube URL
+- `file_url` (str): URL of the music file to analyze (.mp3) or Google Drive link to an MP3 file
+- `endpoint` (str, optional): API endpoint to use. Options: "lyrics_ddex" (default), "music_ddex", "lyrics", "music". Defaults to "lyrics_ddex".
+- `cleanup` (bool, optional): Whether to clean up temporary files and Supabase files after analysis. Defaults to True.
 
 **Returns**:
 - `Optional[Dict[str, Any]]`: Dictionary with analysis results, or None if an error occurs
 
 **Example**:
 ```python
+# Analyze an MP3 file
 analysis = sonoteller.analyze_music("https://example.com/song.mp3")
+
+# Analyze a Google Drive link
+analysis = sonoteller.analyze_music("https://drive.google.com/file/d/FILE_ID/view")
+
+# Analyze using the music_ddex endpoint
+analysis = sonoteller.analyze_music(
+    "https://example.com/song.mp3",
+    endpoint="music_ddex"
+)
+
+# Keep temporary files for debugging
+analysis = sonoteller.analyze_music(
+    "https://drive.google.com/file/d/FILE_ID/view",
+    cleanup=False
+)
+
 if analysis:
     print(f"Language: {analysis.get('language')}")
     print(f"Summary: {analysis.get('summary')}")
@@ -623,32 +642,18 @@ else:
 ```
 
 **Error Handling**:
-- Handles YouTube URLs by using a sample MP3 for testing
-- Makes HTTP requests to the Sonoteller API endpoint (/lyrics_ddex)
+- Validates that the URL is an MP3 file or a Google Drive link
+- For Google Drive links, downloads the file and uploads it to Supabase Storage for direct access
+- Supports multiple Sonoteller API endpoints
+- Makes HTTP requests to the Sonoteller API
 - Properly handles API response status codes and error messages
-- Returns detailed error information if the API call fails
-- Provides a mock response as a fallback when the API call fails
+- Returns detailed error information if the API call fails, including:
+  - Error message
+  - Error details
+  - Raw API response (when available)
+- Cleans up temporary files and Supabase files after analysis (if cleanup=True)
 
-##### Method: `_get_mock_response`
-
-```python
-def _get_mock_response(self) -> Dict[str, Any]
-```
-
-**Description**: Returns a mock response for testing or fallback purposes.
-
-**Parameters**: None
-
-**Returns**:
-- `Dict[str, Any]`: Dictionary with mock analysis results
-
-**Example**:
-```python
-# Used internally when API calls fail
-mock_response = sonoteller._get_mock_response()
-```
-
-**Note**: The mock response follows the same format as the actual API response, with keywords, moods, and themes as lists rather than dictionaries with numeric keys.
+**Note**: The Sonoteller API works best with direct MP3 file URLs. For Google Drive links, the file is downloaded and uploaded to Supabase Storage to provide a direct URL for the API. For YouTube videos or other formats, you must convert them to MP3 format first and then upload to Google Drive or another hosting service.
 
 ### 6. Web UI (web_ui.py)
 
@@ -797,20 +802,114 @@ Tests running Angus on a specific video.
 python test_angus_specific_video.py --video-id VIDEO_ID
 ```
 
+
+### 7. YouTube Audio Extractor (youtube_audio_extractor.py)
+
+The `YouTubeAudioExtractor` class provides functionality to extract audio from YouTube videos for analysis with the Sonoteller API.
+
+#### Class: `YouTubeAudioExtractor`
+
+##### Constructor
+
+```python
+def __init__(self, temp_dir: Optional[str] = None)
+```
+
+**Description**: Initializes the YouTube audio extractor.
+
+**Parameters**:
+- `temp_dir` (Optional[str]): Optional directory to store temporary files. If not provided, system temp directory will be used.
+
+**Returns**: None
+
+**Example**:
+```python
+# Using system temp directory
+extractor = YouTubeAudioExtractor()
+
+# Using custom temp directory
+extractor = YouTubeAudioExtractor(temp_dir="/path/to/temp")
+```
+
+##### Method: `extract_audio`
+
+```python
+def extract_audio(self, youtube_url: str) -> str
+```
+
+**Description**: Extract audio from a YouTube video and save as MP3.
+
+**Parameters**:
+- `youtube_url` (str): URL of the YouTube video
+
+**Returns**:
+- `str`: Path to the extracted MP3 file
+
+**Example**:
+```python
+mp3_path = extractor.extract_audio("https://www.youtube.com/watch?v=VIDEO_ID")
+print(f"Audio extracted to: {mp3_path}")
+```
+
+**Error Handling**:
+- Uses pytube to download the highest quality audio stream
+- Converts the downloaded file to MP3 format
+- Provides detailed error information if the download fails
+
+##### Method: `get_file_url`
+
+```python
+def get_file_url(self, file_path: str) -> str
+```
+
+**Description**: Convert a local file path to a file:// URL.
+
+**Parameters**:
+- `file_path` (str): Path to the local file
+
+**Returns**:
+- `str`: file:// URL for the local file
+
+**Example**:
+```python
+file_url = extractor.get_file_url("/path/to/file.mp3")
+print(f"File URL: {file_url}")
+```
+
+##### Method: `cleanup`
+
+```python
+def cleanup(self, file_path: str) -> None
+```
+
+**Description**: Clean up a temporary file.
+
+**Parameters**:
+- `file_path` (str): Path to the file to clean up
+
+**Returns**: None
+
+**Example**:
+```python
+extractor.cleanup("/path/to/temp/file.mp3")
+```
+
 ### test_sonoteller.py
 
 Tests the Sonoteller API client with a sample MP3 URL or a provided URL.
 
 **Usage**:
 ```bash
-python test_sonoteller.py [--url URL]
+python test_sonoteller.py [--url URL] [--endpoint ENDPOINT] [--no-cleanup]
 ```
 
 **Parameters**:
-- `--url`: Optional URL to a music file. If not provided, a sample URL will be used.
+- `--url`: Optional URL to an MP3 file or Google Drive link. If not provided, a sample URL will be used.
+- `--endpoint`: API endpoint to use. Options: "lyrics_ddex" (default), "music_ddex", "lyrics", "music".
+- `--no-cleanup`: Don't clean up temporary files after analysis.
 
 **Description**:
-This script tests the SonotellerClient by sending a request to the Sonoteller API and displaying the analysis results. It handles both the actual API response and fallback to mock responses if the API call fails. The script is designed to work with both list and dictionary formats for keywords, moods, and themes in the API response.
+This script tests the SonotellerClient by sending a request to the Sonoteller API and displaying the analysis results. It supports Google Drive links by downloading the file and uploading it to Supabase Storage for direct access. The script supports multiple API endpoints and handles both list and dictionary formats for keywords, moods, and themes.
 
 **Example**:
 ```bash
@@ -820,8 +919,14 @@ python test_sonoteller.py
 # Test with a specific MP3 URL
 python test_sonoteller.py --url https://example.com/song.mp3
 
-# Test with a YouTube URL (will use a sample MP3 for testing)
-python test_sonoteller.py --url https://www.youtube.com/watch?v=VIDEO_ID
+# Test with a Google Drive link
+python test_sonoteller.py --url https://drive.google.com/file/d/FILE_ID/view
+
+# Test with the music_ddex endpoint
+python test_sonoteller.py --endpoint music_ddex
+
+# Keep temporary files for debugging
+python test_sonoteller.py --url https://drive.google.com/file/d/FILE_ID/view --no-cleanup
 ```
 
 **Output**:
