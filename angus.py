@@ -87,7 +87,14 @@ class AgentAngus:
         """
         # Initialize clients
         self.supabase = SupabaseClient()
-        self.youtube = YouTubeClient()
+        
+        # Initialize YouTube client with graceful fallback for non-interactive environments
+        try:
+            self.youtube = YouTubeClient(skip_auth_if_noninteractive=True)
+        except Exception as e:
+            logger.error(f"Failed to initialize YouTube client: {str(e)}")
+            logger.warning("Continuing without YouTube functionality")
+            self.youtube = None
         
         # Add Supabase log handler
         try:
@@ -206,6 +213,11 @@ class AgentAngus:
         
         if not video_url:
             logger.warning(f"No video URL for song: {title}")
+            return None
+        
+        # Check if YouTube client is available
+        if self.youtube is None:
+            logger.error(f"Cannot upload song '{title}' - YouTube client is not available")
             return None
         
         logger.info(f"Uploading song '{title}' to YouTube")
@@ -414,6 +426,11 @@ class AgentAngus:
             Number of comments fetched and stored
         """
         logger.info(f"Fetching comments for YouTube video: {youtube_id}")
+        
+        # Check if YouTube client is available
+        if self.youtube is None:
+            logger.error(f"Cannot fetch comments for video '{youtube_id}' - YouTube client is not available")
+            return 0
         
         # Get song_id and title if not provided
         song_title = "Unknown Song"

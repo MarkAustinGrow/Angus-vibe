@@ -30,7 +30,8 @@ class YouTubeClient:
     """
     
     def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None, 
-                 api_key: Optional[str] = None, channel_id: Optional[str] = None):
+                 api_key: Optional[str] = None, channel_id: Optional[str] = None,
+                 skip_auth_if_noninteractive: bool = True):
         """
         Initialize the YouTube client.
         
@@ -39,12 +40,14 @@ class YouTubeClient:
             client_secret: YouTube OAuth client secret (defaults to environment variable)
             api_key: YouTube API key (defaults to environment variable)
             channel_id: YouTube channel ID (defaults to environment variable)
+            skip_auth_if_noninteractive: Skip authentication if running in a non-interactive environment
         """
         self.client_id = client_id or YOUTUBE_CLIENT_ID
         self.client_secret = client_secret or YOUTUBE_CLIENT_SECRET
         self.api_key = api_key or YOUTUBE_API_KEY
         self.channel_id = channel_id or YOUTUBE_CHANNEL_ID
         self.youtube = None
+        self.skip_auth_if_noninteractive = skip_auth_if_noninteractive
         
         # Validate credentials
         if not self.client_id or not self.client_secret:
@@ -54,10 +57,16 @@ class YouTubeClient:
         # Initialize client
         try:
             self.authenticate()
-            logger.info("YouTube client initialized")
+            if self.youtube:
+                logger.info("YouTube client initialized")
+            else:
+                logger.warning("YouTube client initialization skipped (non-interactive environment)")
         except Exception as e:
             logger.error(f"Error initializing YouTube client: {str(e)}")
-            raise
+            if self.skip_auth_if_noninteractive:
+                logger.warning("Continuing without YouTube functionality")
+            else:
+                raise
     
     def authenticate(self) -> None:
         """
@@ -113,6 +122,15 @@ class YouTubeClient:
                     client_secrets_file = f.name
                 
                 try:
+                    # Check if we're running in a non-interactive environment
+                    import sys
+                    is_noninteractive = not sys.stdin.isatty()
+                    
+                    if is_noninteractive and self.skip_auth_if_noninteractive:
+                        logger.warning("Running in non-interactive environment, skipping OAuth authentication")
+                        self.youtube = None
+                        return
+                    
                     # Create flow from client secrets file
                     flow = InstalledAppFlow.from_client_secrets_file(
                         client_secrets_file, 
@@ -127,14 +145,23 @@ class YouTubeClient:
                     print(f"Please visit this URL to authorize this application: {auth_url}")
                     print("After authorization, you will receive a code. Please enter that code here:")
                     
-                    # Get the authorization code from the user
-                    code = input().strip()
-                    
-                    # Exchange the authorization code for credentials
-                    flow.fetch_token(code=code)
-                    creds = flow.credentials
-                    
-                    logger.info("Authentication successful")
+                    try:
+                        # Get the authorization code from the user
+                        code = input().strip()
+                        
+                        # Exchange the authorization code for credentials
+                        flow.fetch_token(code=code)
+                        creds = flow.credentials
+                        
+                        logger.info("Authentication successful")
+                    except EOFError:
+                        logger.warning("Cannot read input in non-interactive environment")
+                        if self.skip_auth_if_noninteractive:
+                            logger.warning("Skipping OAuth authentication")
+                            self.youtube = None
+                            return
+                        else:
+                            raise
                 finally:
                     # Clean up temporary file
                     if os.path.exists(client_secrets_file):
