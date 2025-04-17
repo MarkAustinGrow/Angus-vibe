@@ -204,15 +204,58 @@ class YouTubeClient:
         os.close(temp_fd)  # Close the file descriptor immediately
         
         try:
-            # Download the video
-            response = requests.get(video_url, stream=True)
-            response.raise_for_status()  # Raise exception for HTTP errors
-            
-            with open(temp_video_path, 'wb') as temp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    temp_file.write(chunk)
-            
-            logger.info(f"Downloaded video to temporary file: {temp_video_path}")
+            # Check if the URL is a file:// URL
+            if video_url.startswith('file://'):
+                # Extract the file path from the URL
+                file_path = video_url[7:]  # Remove 'file://' prefix
+                
+                # Handle Windows paths on Linux
+                if ':' in file_path and '\\' in file_path:  # Windows path with drive letter
+                    logger.warning(f"Windows file path detected: {file_path}")
+                    logger.warning("This path may not be accessible from within a Docker container.")
+                    logger.warning("Please ensure the file is accessible from within the container.")
+                    
+                    # Try to find the file in the container's filesystem
+                    # Check common locations where the file might be mounted
+                    possible_paths = [
+                        # Original path (unlikely to work in Docker)
+                        file_path,
+                        # Try replacing backslashes with forward slashes
+                        file_path.replace('\\', '/'),
+                        # Try removing the drive letter and using a container path
+                        os.path.join('/app/data/uploads', os.path.basename(file_path.replace('\\', '/'))),
+                        # Try the uploads directory
+                        os.path.join('/app/uploads', os.path.basename(file_path.replace('\\', '/'))),
+                        # Try the data directory
+                        os.path.join('/app/data', os.path.basename(file_path.replace('\\', '/')))
+                    ]
+                    
+                    # Try each possible path
+                    file_found = False
+                    for path in possible_paths:
+                        if os.path.exists(path):
+                            file_path = path
+                            file_found = True
+                            logger.info(f"Found file at: {file_path}")
+                            break
+                    
+                    if not file_found:
+                        raise FileNotFoundError(f"Could not find file in container: {file_path}")
+                
+                # Copy the file to our temporary location
+                import shutil
+                shutil.copy2(file_path, temp_video_path)
+                logger.info(f"Copied file from {file_path} to temporary file: {temp_video_path}")
+            else:
+                # Download the video from a remote URL
+                response = requests.get(video_url, stream=True)
+                response.raise_for_status()  # Raise exception for HTTP errors
+                
+                with open(temp_video_path, 'wb') as temp_file:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        temp_file.write(chunk)
+                
+                logger.info(f"Downloaded video to temporary file: {temp_video_path}")
             
             # Prepare video metadata
             body = {
