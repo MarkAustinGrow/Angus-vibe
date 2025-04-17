@@ -13,9 +13,6 @@ from typing import Optional, Dict, Any, Union
 # Import configuration
 from config import OPENAI_API_KEY
 
-# Import YouTube audio extractor
-from youtube_audio_extractor import YouTubeAudioExtractor
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -49,6 +46,7 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             Please provide a detailed analysis of the music in this video including:
             1. Lyrics analysis (themes, moods, language, explicit content)
             2. Music analysis (genres, subgenres, instruments, BPM, key)
+            3. Music creation parameters (for use with musicapi.ai)
             
             Your response MUST be a valid JSON object with this exact structure:
             {{
@@ -66,8 +64,24 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
                     "bpm": "Estimated BPM",
                     "key": "Estimated key",
                     "vocals": "Description of vocals"
+                }},
+                "music_creation_params": {{
+                    "prompt": "Full lyrics of the song, formatted with [Verse], [Chorus], etc. sections",
+                    "title": "Suggested title for the song",
+                    "tags": "Comma-separated tags for the song style (e.g., 'pop, rock, electronic')",
+                    "negative_tags": "Comma-separated tags for elements to avoid",
+                    "gpt_description_prompt": "Brief description of the music style",
+                    "make_instrumental": false,
+                    "mv": "sonic-v3-5"
                 }}
             }}
+            
+            For the music_creation_params:
+            - prompt: Extract the full lyrics and format them with proper section labels ([Verse], [Chorus], etc.)
+            - title: Suggest an appropriate title based on the lyrics and theme
+            - tags: List the primary genres/styles as comma-separated values
+            - negative_tags: Suggest elements to avoid based on what wouldn't fit the style
+            - gpt_description_prompt: Write a brief description of the music style
             
             Do not include any text outside of the JSON structure. Your entire response should be valid JSON.
             """

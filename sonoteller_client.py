@@ -1,4 +1,4 @@
-"""
+classmethod"""
 Sonoteller client for analyzing music using the Sonoteller API.
 """
 import http.client

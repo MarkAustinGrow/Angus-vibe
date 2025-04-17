@@ -441,8 +441,8 @@
                 };
                 
                 // Send the request
-                // Use a relative path that works with both root and /push
-                xhr.open('POST', 'upload', true);
+                // Use an absolute path that starts with a slash
+                xhr.open('POST', '/upload', true);
                 xhr.send(formData);
                 
             } catch (error) {
@@ -501,8 +501,8 @@
             
             try {
                 // Send the parsed analysis to the server
-                // Use a relative path that works with both root and /push
-                const response = await fetch('save_parsed_analysis', {
+                // Use an absolute path that starts with a slash
+                const response = await fetch('/save_parsed_analysis', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -704,8 +704,10 @@
                 // Get the selected model
                 const model = document.getElementById('model-select').value;
                 
-                // Use a relative path that works with both root and /push
-                const response = await fetch('analyze_youtube', {
+                console.log(`Sending request to analyze YouTube URL: ${url} with model: ${model}`);
+                
+                // Use an absolute path that starts with a slash
+                const response = await fetch('/analyze_youtube', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -716,7 +718,16 @@
                     })
                 });
                 
+                console.log(`Response status: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`Error response: ${errorText}`);
+                    throw new Error(`Server responded with status: ${response.status} ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('Response data received:', data);
                 
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
@@ -729,11 +740,18 @@
                 // Format and display the results
                 formatAnalysisResults(data.analysis);
                 
+                // Display music creation parameters if they exist
+                if (data.music_creation_params) {
+                    console.log('Music creation parameters:', data.music_creation_params);
+                    displayMusicCreationParams(data.music_creation_params);
+                }
+                
                 // Also display the raw JSON
                 document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
                 document.getElementById('result').style.display = 'block';
                 
             } catch (error) {
+                console.error('Error in YouTube analysis:', error);
                 document.getElementById('loading').style.display = 'none';
                 showError('An error occurred: ' + error.message);
             }
@@ -764,8 +782,8 @@
                 // Get the selected model
                 const model = document.getElementById('model-select').value;
                 
-                // Use a relative path that works with both root and /push
-                const response = await fetch('analyze', {
+                // Use an absolute path that starts with a slash
+                const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1086,6 +1104,53 @@
                 `;
                 contentElement.appendChild(flagsSection);
             }
+        }
+        
+        function displayMusicCreationParams(params) {
+            const contentElement = document.getElementById('analysis-content');
+            
+            // Create a section for Music Creation Parameters
+            const creationSection = document.createElement('div');
+            creationSection.className = 'analysis-section';
+            creationSection.innerHTML = '<h2>Music Creation Parameters</h2>';
+            contentElement.appendChild(creationSection);
+            
+            // Create a pre element for the parameters
+            const paramsSection = document.createElement('div');
+            paramsSection.className = 'analysis-section';
+            
+            // Format the parameters as JSON
+            const formattedParams = JSON.stringify(params, null, 2);
+            
+            paramsSection.innerHTML = `
+                <h3>Parameters for musicapi.ai</h3>
+                <pre>${formattedParams}</pre>
+                <p>These parameters can be used with the musicapi.ai API to create a similar song.</p>
+            `;
+            
+            contentElement.appendChild(paramsSection);
+            
+            // Add a button to copy the parameters to clipboard
+            const copyButton = document.createElement('button');
+            copyButton.textContent = 'Copy Parameters';
+            copyButton.style.backgroundColor = '#F9A826';
+            copyButton.style.color = 'white';
+            copyButton.style.marginTop = '10px';
+            
+            copyButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(formattedParams)
+                    .then(() => {
+                        copyButton.textContent = 'Copied!';
+                        setTimeout(() => {
+                            copyButton.textContent = 'Copy Parameters';
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+            
+            paramsSection.appendChild(copyButton);
         }
         
         function showError(message, details = '', rawResponse = '') {

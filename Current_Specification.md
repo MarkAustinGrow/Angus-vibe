@@ -153,7 +153,7 @@ Comprehensive CLI with options for:
 - Customizable system prompts based on song information
 - Error handling for API failures
 
-### Sonoteller Integration
+### Open AI Song Analysis Integration
 
 - Multiple analysis endpoints for different types of analysis
 - Support for direct MP3 URLs
