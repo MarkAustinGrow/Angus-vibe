@@ -50,6 +50,7 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             2. Music analysis (genres, subgenres, instruments, BPM, key)
             3. Generate sample lyrics (max 2000 characters) inspired by this music
             4. Recommend parameters for music creation:
+            5. Extract or suggest a concise title for this music (max 50 characters)
                - Genre (select one from: Folk, Pop, Rock, Chinese Style, Hip Hop/Rap, R&B/Soul, Punk, Electronic, Jazz, Reggae, DJ, Pop Punk, Disco, Future Bass, Pop Rap, Trap Rap, R&B Rap, Chinoiserie Electronic, GuFeng Music, Pop Rock, Jazz Pop, Bossa Nova, Contemporary R&B)
                - Mood (select one from: Happy, Dynamic/Energetic, Sentimental/Melancholic/Lonely, Inspirational/Hopeful, Nostalgic/Memory, Excited, Sorrow/Sad, Chill, Romantic, Miss, Groovy/Funky, Dreamy/Ethereal, Calm/Relaxing)
                - Timbre (select one from: Warm, Bright, Husky, Electrified voice, Sweet, Cute, Loud and sonorous, Powerful, Sexy/Lazy)
@@ -78,7 +79,8 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
                     "mood": "One mood from the allowed list",
                     "timbre": "One timbre from the allowed list",
                     "duration": 120
-                }}
+                }},
+                "title": "Extracted or suggested title for the music"
             }}
             
             Do not include any text outside of the JSON structure. Your entire response should be valid JSON.
@@ -99,6 +101,7 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             2. Music analysis (genres, subgenres, instruments, BPM, key)
             3. Generate sample lyrics (max 2000 characters) inspired by this music
             4. Recommend parameters for music creation:
+            5. Extract or suggest a concise title for this music (max 50 characters)
                - Genre (select one from: Folk, Pop, Rock, Chinese Style, Hip Hop/Rap, R&B/Soul, Punk, Electronic, Jazz, Reggae, DJ, Pop Punk, Disco, Future Bass, Pop Rap, Trap Rap, R&B Rap, Chinoiserie Electronic, GuFeng Music, Pop Rock, Jazz Pop, Bossa Nova, Contemporary R&B)
                - Mood (select one from: Happy, Dynamic/Energetic, Sentimental/Melancholic/Lonely, Inspirational/Hopeful, Nostalgic/Memory, Excited, Sorrow/Sad, Chill, Romantic, Miss, Groovy/Funky, Dreamy/Ethereal, Calm/Relaxing)
                - Timbre (select one from: Warm, Bright, Husky, Electrified voice, Sweet, Cute, Loud and sonorous, Powerful, Sexy/Lazy)
@@ -127,7 +130,8 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
                     "mood": "One mood from the allowed list",
                     "timbre": "One timbre from the allowed list",
                     "duration": 120
-                }}
+                }},
+                "title": "Extracted or suggested title for the music"
             }}
             
             Do not include any text outside of the JSON structure. Your entire response should be valid JSON.
@@ -208,7 +212,10 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
                 "mood": analysis.get("music_creation_params", {}).get("mood", "Happy"),  # Default to Happy if not specified
                 "timbre": analysis.get("music_creation_params", {}).get("timbre", "Warm"),  # Default to Warm if not specified
                 "duration": analysis.get("music_creation_params", {}).get("duration", 120)  # Default to 120 seconds if not specified
-            }
+            },
+            # Add title and original URL
+            "title": analysis.get("title", os.path.basename(input_source)),
+            "original_url": input_source  # Store the original URL
         }
         
         return formatted_analysis

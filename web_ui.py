@@ -152,11 +152,27 @@ def save_parsed_analysis():
     # Create a dummy URL if none is provided
     url = data.get('url', 'https://sonoteller.com/manual_input')
     
-    # Store the analysis in Supabase
+    # Extract a title from the analysis or generate a default one
+    title = analysis.get('title', '')
+    if not title:
+        # Generate a title from the filename or a default
+        if 'youtube.com' in url or 'youtu.be' in url:
+            title = "YouTube Song"
+        else:
+            title = os.path.basename(url)[:50]  # Limit to 50 chars
+    
+    # Make sure the title is not too long (max 50 chars)
+    title = title[:50]
+    
+    # Store the title in the url field, and the actual URL in the analysis
     influence_data = {
-        'url': url,
+        'url': title,  # Store the title in the url field
         'analysis': analysis
     }
+    
+    # Make sure the original URL is stored in the analysis
+    if 'original_url' not in analysis:
+        analysis['original_url'] = url
     
     # If a song_id was provided, associate the analysis with that song
     song_id = data.get('song_id')
@@ -219,11 +235,27 @@ def analyze():
         logger.error(f"Unexpected error in analyze: {str(e)}")
         return jsonify({'error': 'Server error', 'details': str(e)}), 500
     
-    # Store the analysis in Supabase
+    # Extract a title from the analysis or generate a default one
+    title = analysis.get('title', '')
+    if not title:
+        # Generate a title from the filename or a default
+        if 'youtube.com' in url or 'youtu.be' in url:
+            title = "YouTube Song"
+        else:
+            title = os.path.basename(url)[:50]  # Limit to 50 chars
+    
+    # Make sure the title is not too long (max 50 chars)
+    title = title[:50]
+    
+    # Store the title in the url field, and the actual URL in the analysis
     influence_data = {
-        'url': url,
+        'url': title,  # Store the title in the url field
         'analysis': analysis
     }
+    
+    # Make sure the original URL is stored in the analysis
+    if 'original_url' not in analysis:
+        analysis['original_url'] = url
     
     # If a song_id was provided, associate the analysis with that song
     song_id = data.get('song_id')
@@ -296,11 +328,27 @@ def analyze_youtube():
         logger.error(f"Unexpected error in analyze_youtube: {str(e)}")
         return jsonify({'error': 'Server error', 'details': str(e)}), 500
     
-    # Store the analysis in Supabase
+    # Extract a title from the analysis or generate a default one
+    title = analysis.get('title', '')
+    if not title:
+        # Generate a title from the filename or a default
+        if 'youtube.com' in url or 'youtu.be' in url:
+            title = "YouTube Song"
+        else:
+            title = os.path.basename(url)[:50]  # Limit to 50 chars
+    
+    # Make sure the title is not too long (max 50 chars)
+    title = title[:50]
+    
+    # Store the title in the url field, and the actual URL in the analysis
     influence_data = {
-        'url': url,
+        'url': title,  # Store the title in the url field
         'analysis': analysis
     }
+    
+    # Make sure the original URL is stored in the analysis
+    if 'original_url' not in analysis:
+        analysis['original_url'] = url
     
     # If a song_id was provided, associate the analysis with that song
     song_id = data.get('song_id')
