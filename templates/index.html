@@ -681,15 +681,21 @@
         
         // Analyze YouTube button click handler
         analyzeYoutubeBtn.addEventListener('click', async () => {
+            console.log('Analyze YouTube button clicked');
+            alert('Button clicked!'); // This will show a popup when the button is clicked
+            
             const url = youtubeUrlInput.value.trim();
+            console.log('YouTube URL:', url);
             
             if (!url) {
+                console.log('No URL provided');
                 showError('Please enter a YouTube URL');
                 return;
             }
             
             // Simple validation for YouTube URL
             if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+                console.log('Invalid YouTube URL');
                 showError('Please enter a valid YouTube URL');
                 return;
             }
@@ -705,6 +711,7 @@
                 const model = document.getElementById('model-select').value;
                 
                 console.log(`Sending request to analyze YouTube URL: ${url} with model: ${model}`);
+                console.log('Request URL:', '/analyze_youtube');
                 
                 // Use an absolute path that starts with a slash
                 const response = await fetch('/analyze_youtube', {
@@ -716,28 +723,36 @@
                         url,
                         model
                     })
+                }).catch(err => {
+                    console.error('Fetch error:', err);
+                    throw new Error(`Fetch failed: ${err.message}`);
                 });
                 
                 console.log(`Response status: ${response.status} ${response.statusText}`);
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
+                    const errorText = await response.text().catch(e => 'Could not read error response');
                     console.error(`Error response: ${errorText}`);
                     throw new Error(`Server responded with status: ${response.status} ${response.statusText}`);
                 }
                 
-                const data = await response.json();
+                const data = await response.json().catch(e => {
+                    console.error('JSON parse error:', e);
+                    throw new Error('Failed to parse JSON response');
+                });
                 console.log('Response data received:', data);
                 
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
                 
                 if (data.error) {
+                    console.error('Error in response:', data.error, data.details);
                     showError(data.error, data.details);
                     return;
                 }
                 
                 // Format and display the results
+                console.log('Formatting analysis results');
                 formatAnalysisResults(data.analysis);
                 
                 // Display music creation parameters if they exist
@@ -749,6 +764,7 @@
                 // Also display the raw JSON
                 document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
                 document.getElementById('result').style.display = 'block';
+                console.log('Analysis complete and displayed');
                 
             } catch (error) {
                 console.error('Error in YouTube analysis:', error);
@@ -1170,3 +1186,22 @@
             errorElement.innerHTML = errorHTML;
             errorElement.style.display = 'block';
         }
+
+        // Add this at the end of the file to check if the button and event listener are properly initialized
+        console.log('Script loaded');
+        console.log('YouTube button element:', document.getElementById('analyze-youtube-btn'));
+        console.log('YouTube URL input element:', document.getElementById('youtube-url'));
+
+        // Test click handler directly
+        setTimeout(() => {
+            console.log('Testing click handler initialization...');
+            const btn = document.getElementById('analyze-youtube-btn');
+            if (btn) {
+                console.log('Button found, adding test click handler');
+                btn.addEventListener('click', function() {
+                    console.log('Test click handler triggered');
+                });
+            } else {
+                console.error('Button not found in DOM');
+            }
+        }, 1000);
