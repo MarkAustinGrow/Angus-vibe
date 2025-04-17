@@ -210,13 +210,35 @@ print(f"Fetched a total of {total_comments} comments")
 - Adds a small delay between requests to avoid rate limiting
 - Stops when the maximum total replies is reached
 
+##### Method: `cleanup_old_logs`
+
+```python
+def cleanup_old_logs(self, days_to_keep=7) -> int
+```
+
+**Description**: Remove logs older than the specified number of days.
+
+**Parameters**:
+- `days_to_keep` (int, optional): Number of days of logs to keep. Defaults to 7.
+
+**Returns**:
+- `int`: Number of logs deleted
+
+**Example**:
+```python
+deleted_count = angus.cleanup_old_logs(days_to_keep=14)
+print(f"Deleted {deleted_count} old logs")
+```
+
+**Error Handling**: Returns 0 if an error occurs during the cleanup operation.
+
 ##### Method: `run_scheduled_tasks`
 
 ```python
 def run_scheduled_tasks(self)
 ```
 
-**Description**: Runs scheduled tasks continuously. This method sets up scheduled tasks to run at specified intervals: upload videos to YouTube every hour and fetch comments from YouTube videos every hour. The method runs indefinitely until interrupted.
+**Description**: Runs scheduled tasks continuously. This method sets up scheduled tasks to run at specified intervals: upload videos to YouTube every hour, fetch comments from YouTube videos every hour, and clean up old logs every day. The method runs indefinitely until interrupted.
 
 **Parameters**: None
 
@@ -373,6 +395,85 @@ for song in songs:
 ```
 
 **Error Handling**: Returns an empty list if an error occurs or if no songs are found.
+
+##### Method: `create_storage_bucket`
+
+```python
+def create_storage_bucket(self, bucket_name: str, is_public: bool = True) -> bool
+```
+
+**Description**: Create a storage bucket if it doesn't exist.
+
+**Parameters**:
+- `bucket_name` (str): Name of the bucket to create
+- `is_public` (bool, optional): Whether the bucket should be public. Defaults to True.
+
+**Returns**:
+- `bool`: True if the bucket was created or already exists, False otherwise
+
+**Example**:
+```python
+success = supabase.create_storage_bucket('uploads', is_public=True)
+if success:
+    print("Storage bucket created successfully")
+else:
+    print("Failed to create storage bucket")
+```
+
+**Error Handling**: Returns False if an error occurs during bucket creation.
+
+##### Method: `upload_file_to_storage`
+
+```python
+def upload_file_to_storage(self, bucket_name: str, file_path: str, file_name: Optional[str] = None) -> Optional[str]
+```
+
+**Description**: Upload a file to a storage bucket.
+
+**Parameters**:
+- `bucket_name` (str): Name of the bucket to upload to
+- `file_path` (str): Path to the file to upload
+- `file_name` (Optional[str]): Name to use for the file in storage (defaults to basename of file_path)
+
+**Returns**:
+- `Optional[str]`: Public URL of the uploaded file, or None if upload failed
+
+**Example**:
+```python
+url = supabase.upload_file_to_storage('uploads', '/path/to/file.mp3')
+if url:
+    print(f"File uploaded to: {url}")
+else:
+    print("Failed to upload file")
+```
+
+**Error Handling**: Returns None if an error occurs during file upload.
+
+##### Method: `delete_file_from_storage`
+
+```python
+def delete_file_from_storage(self, bucket_name: str, file_name: str) -> bool
+```
+
+**Description**: Delete a file from a storage bucket.
+
+**Parameters**:
+- `bucket_name` (str): Name of the bucket containing the file
+- `file_name` (str): Name of the file to delete
+
+**Returns**:
+- `bool`: True if the file was deleted, False otherwise
+
+**Example**:
+```python
+success = supabase.delete_file_from_storage('uploads', 'file.mp3')
+if success:
+    print("File deleted successfully")
+else:
+    print("Failed to delete file")
+```
+
+**Error Handling**: Returns False if an error occurs during file deletion.
 
 ### 3. YouTubeClient (youtube_client.py)
 
@@ -595,15 +696,14 @@ sonoteller = SonotellerClient(SONOTELLER_API_KEY)
 ##### Method: `analyze_music`
 
 ```python
-def analyze_music(self, file_url: str, endpoint: str = "lyrics_ddex", cleanup: bool = True) -> Optional[Dict[str, Any]]
+def analyze_music(self, file_url: str, endpoint: str = "lyrics_ddex") -> Optional[Dict[str, Any]]
 ```
 
 **Description**: Analyze a music file using the Sonoteller API.
 
 **Parameters**:
-- `file_url` (str): URL of the music file to analyze (.mp3) or Google Drive link to an MP3 file
+- `file_url` (str): URL of the music file to analyze (.mp3 only)
 - `endpoint` (str, optional): API endpoint to use. Options: "lyrics_ddex" (default), "music_ddex", "lyrics", "music". Defaults to "lyrics_ddex".
-- `cleanup` (bool, optional): Whether to clean up temporary files and Supabase files after analysis. Defaults to True.
 
 **Returns**:
 - `Optional[Dict[str, Any]]`: Dictionary with analysis results, or None if an error occurs
@@ -613,19 +713,10 @@ def analyze_music(self, file_url: str, endpoint: str = "lyrics_ddex", cleanup: b
 # Analyze an MP3 file
 analysis = sonoteller.analyze_music("https://example.com/song.mp3")
 
-# Analyze a Google Drive link
-analysis = sonoteller.analyze_music("https://drive.google.com/file/d/FILE_ID/view")
-
 # Analyze using the music_ddex endpoint
 analysis = sonoteller.analyze_music(
     "https://example.com/song.mp3",
     endpoint="music_ddex"
-)
-
-# Keep temporary files for debugging
-analysis = sonoteller.analyze_music(
-    "https://drive.google.com/file/d/FILE_ID/view",
-    cleanup=False
 )
 
 if analysis:
@@ -642,8 +733,7 @@ else:
 ```
 
 **Error Handling**:
-- Validates that the URL is an MP3 file or a Google Drive link
-- For Google Drive links, downloads the file and uploads it to Supabase Storage for direct access
+- Validates that the URL is an MP3 file
 - Supports multiple Sonoteller API endpoints
 - Makes HTTP requests to the Sonoteller API
 - Properly handles API response status codes and error messages
@@ -651,9 +741,8 @@ else:
   - Error message
   - Error details
   - Raw API response (when available)
-- Cleans up temporary files and Supabase files after analysis (if cleanup=True)
 
-**Note**: The Sonoteller API works best with direct MP3 file URLs. For Google Drive links, the file is downloaded and uploaded to Supabase Storage to provide a direct URL for the API. For YouTube videos or other formats, you must convert them to MP3 format first and then upload to Google Drive or another hosting service.
+**Note**: The Sonoteller API works best with direct MP3 file URLs. For YouTube videos or other formats, you can use the YouTubeAudioExtractor to convert them to MP3 format first.
 
 ### 6. Web UI (web_ui.py)
 
@@ -688,6 +777,22 @@ run_web_ui(port=8080)
 
 **Returns**: HTML page with a form for entering a music URL.
 
+#### Route: `/upload`
+
+**Description**: Upload a file and return its URL.
+
+**Method**: POST
+
+**Parameters**:
+- `file`: The file to upload (must be an MP3 file)
+
+**Returns**: JSON response with the uploaded file URL.
+
+**Error Handling**:
+- Returns a 400 error if no file is provided
+- Returns a 400 error if the file is not an MP3
+- Generates a unique filename to avoid conflicts
+
 #### Route: `/analyze`
 
 **Description**: Analyzes a music file using the Sonoteller API.
@@ -695,113 +800,34 @@ run_web_ui(port=8080)
 **Method**: POST
 
 **Parameters**:
-- `url` (str): URL of the music file to analyze (.mp3) or YouTube URL
+- `url` (str): URL of the music file to analyze (.mp3)
+- `endpoint` (str, optional): API endpoint to use. Defaults to "lyrics_ddex".
 - `song_id` (str, optional): Optional song ID to associate with the analysis
 
 **Returns**: JSON response with analysis results.
 
 **Error Handling**:
 - Returns a 400 error if no URL is provided
+- Returns a 400 error if the URL is not an MP3
 - Returns a 500 error if the analysis fails
 - Stores the analysis in the influence_music table in Supabase
 
-## Database Schema
+#### Route: `/save_parsed_analysis`
 
-### YouTube Table
+**Description**: Save parsed Sonoteller analysis to the database.
 
-The YouTube table tracks videos uploaded to YouTube:
+**Method**: POST
 
-```sql
-create table if not exists youtube (
-  id uuid default uuid_generate_v4() primary key,
-  song_id uuid references songs(id),
-  youtube_id text unique,
-  title text,
-  description text,
-  upload_date timestamp with time zone default now(),
-  status text,
-  view_count integer default 0,
-  like_count integer default 0
-);
+**Parameters**:
+- `analysis` (Dict): The analysis data to save
+- `url` (str, optional): URL of the analyzed music file
+- `song_id` (str, optional): Optional song ID to associate with the analysis
 
--- Create index for faster lookups
-create index if not exists youtube_song_id_idx on youtube(song_id);
-create index if not exists youtube_youtube_id_idx on youtube(youtube_id);
-create index if not exists youtube_status_idx on youtube(status);
+**Returns**: JSON response with the saved analysis ID.
 
--- Add comment to explain table purpose
-comment on table youtube is 'Tracks videos uploaded to YouTube from the songs table';
-```
-
-| Field Name      | Type        | Description                                  |
-|----------------|------------|----------------------------------------------|
-| `id` (PK)      | `uuid`      | Unique ID, primary key (auto-generated)     |
-| `song_id`      | `uuid`      | Reference to songs table                    |
-| `youtube_id`   | `text`      | YouTube video ID                            |
-| `title`        | `text`      | Video title on YouTube                      |
-| `description`  | `text`      | Video description on YouTube                |
-| `upload_date`  | `timestamp` | Timestamp of when the video was uploaded    |
-| `status`       | `text`      | Upload status (e.g., "pending", "uploaded", "failed") |
-| `view_count`   | `integer`   | Number of views (can be updated periodically) |
-| `like_count`   | `integer`   | Number of likes (can be updated periodically) |
-
-## Test Scripts
-
-### test_angus.py
-
-Unit tests for Agent Angus using mocks to avoid making actual API calls.
-
-**Test Cases**:
-- `test_create_youtube_table`: Tests creating the YouTube table
-- `test_get_songs_to_upload`: Tests getting songs to upload
-- `test_upload_song_to_youtube`: Tests uploading a song to YouTube
-- `test_fetch_comments`: Tests fetching comments for a video
-
-### test_openai_response.py
-
-Tests the OpenAI response generation without requiring YouTube integration.
-
-**Usage**:
-```bash
-python test_openai_response.py
-```
-
-### test_youtube_reply.py
-
-Tests the ability to reply to a specific YouTube comment.
-
-**Usage**:
-```bash
-python test_youtube_reply.py --video-id VIDEO_ID [--comment-id COMMENT_ID]
-```
-
-### test_comment_response_flow.py
-
-Tests the entire comment response flow from fetching comments to generating responses and posting replies.
-
-**Usage**:
-```bash
-python test_comment_response_flow.py --video-id VIDEO_ID
-```
-
-### test_fetch_specific_video.py
-
-Tests fetching comments for a specific video and checking if they have replies.
-
-**Usage**:
-```bash
-python test_fetch_specific_video.py --video-id VIDEO_ID
-```
-
-### test_angus_specific_video.py
-
-Tests running Angus on a specific video.
-
-**Usage**:
-```bash
-python test_angus_specific_video.py --video-id VIDEO_ID
-```
-
+**Error Handling**:
+- Returns a 400 error if no analysis is provided
+- Returns a 500 error if saving fails
 
 ### 7. YouTube Audio Extractor (youtube_audio_extractor.py)
 
@@ -894,48 +920,45 @@ def cleanup(self, file_path: str) -> None
 extractor.cleanup("/path/to/temp/file.mp3")
 ```
 
-### test_sonoteller.py
+## Database Schema
 
-Tests the Sonoteller API client with a sample MP3 URL or a provided URL.
+### YouTube Table
 
-**Usage**:
-```bash
-python test_sonoteller.py [--url URL] [--endpoint ENDPOINT] [--no-cleanup]
+The YouTube table tracks videos uploaded to YouTube:
+
+```sql
+create table if not exists youtube (
+  id uuid default uuid_generate_v4() primary key,
+  song_id uuid references songs(id),
+  youtube_id text unique,
+  title text,
+  description text,
+  upload_date timestamp with time zone default now(),
+  status text,
+  view_count integer default 0,
+  like_count integer default 0
+);
+
+-- Create index for faster lookups
+create index if not exists youtube_song_id_idx on youtube(song_id);
+create index if not exists youtube_youtube_id_idx on youtube(youtube_id);
+create index if not exists youtube_status_idx on youtube(status);
+
+-- Add comment to explain table purpose
+comment on table youtube is 'Tracks videos uploaded to YouTube from the songs table';
 ```
 
-**Parameters**:
-- `--url`: Optional URL to an MP3 file or Google Drive link. If not provided, a sample URL will be used.
-- `--endpoint`: API endpoint to use. Options: "lyrics_ddex" (default), "music_ddex", "lyrics", "music".
-- `--no-cleanup`: Don't clean up temporary files after analysis.
-
-**Description**:
-This script tests the SonotellerClient by sending a request to the Sonoteller API and displaying the analysis results. It supports Google Drive links by downloading the file and uploading it to Supabase Storage for direct access. The script supports multiple API endpoints and handles both list and dictionary formats for keywords, moods, and themes.
-
-**Example**:
-```bash
-# Test with the default sample MP3
-python test_sonoteller.py
-
-# Test with a specific MP3 URL
-python test_sonoteller.py --url https://example.com/song.mp3
-
-# Test with a Google Drive link
-python test_sonoteller.py --url https://drive.google.com/file/d/FILE_ID/view
-
-# Test with the music_ddex endpoint
-python test_sonoteller.py --endpoint music_ddex
-
-# Keep temporary files for debugging
-python test_sonoteller.py --url https://drive.google.com/file/d/FILE_ID/view --no-cleanup
-```
-
-**Output**:
-The script outputs the full JSON response from the API, as well as formatted key information such as:
-- Language
-- Summary
-- Moods
-- Themes
-- Keywords
+| Field Name      | Type        | Description                                  |
+|----------------|------------|----------------------------------------------|
+| `id` (PK)      | `uuid`      | Unique ID, primary key (auto-generated)     |
+| `song_id`      | `uuid`      | Reference to songs table                    |
+| `youtube_id`   | `text`      | YouTube video ID                            |
+| `title`        | `text`      | Video title on YouTube                      |
+| `description`  | `text`      | Video description on YouTube                |
+| `upload_date`  | `timestamp` | Timestamp of when the video was uploaded    |
+| `status`       | `text`      | Upload status (e.g., "pending", "uploaded", "failed") |
+| `view_count`   | `integer`   | Number of views (can be updated periodically) |
+| `like_count`   | `integer`   | Number of likes (can be updated periodically) |
 
 ### Influence Music Table
 
@@ -965,109 +988,7 @@ comment on table influence_music is 'Stores Sonoteller analysis results for infl
 | `analysis`     | `jsonb`     | JSON data with Sonoteller analysis results  |
 | `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
 
-## Command-Line Interface
+## Test Scripts
 
-Agent Angus provides a command-line interface for various operations:
-
-```bash
-python angus.py [options]
-```
-
-**Options**:
-- `--create-table`: Create the YouTube table in Supabase
-- `--upload`: Upload pending songs to YouTube
-- `--fetch-comments`: Fetch comments for uploaded videos
-- `--limit N`: Limit the number of items to process (default: 1)
-- `--max-replies N`: Maximum number of comment replies to post (default: 10)
-- `--daemon`: Run in daemon mode with scheduled tasks
-- `--web`: Run the web UI for Sonoteller analysis
-- `--port N`: Port for the web UI (default: 5000)
-
-**Examples**:
-
-Create the YouTube table:
-```bash
-python angus.py --create-table
-```
-
-Upload pending songs to YouTube:
-```bash
-python angus.py --upload --limit 5
-```
-
-Fetch comments for uploaded videos:
-```bash
-python angus.py --fetch-comments --limit 10 --max-replies 10
-```
-
-Run in daemon mode with scheduled tasks:
-```bash
-python angus.py --daemon
-```
-
-Run the web UI for Sonoteller analysis:
-```bash
-python angus.py --web --port 8080
-```
-
-## Run Scripts
-
-### run_angus.bat (Windows)
-
-Batch script to run Agent Angus with common commands.
-
-**Usage**:
-```batch
-run_angus.bat [command] [options]
-```
-
-**Commands**:
-- `setup`: Create the YouTube table in Supabase
-- `upload`: Upload pending songs to YouTube
-- `comments`: Fetch comments for uploaded videos
-- `daemon`: Run in daemon mode with scheduled tasks
-- `web`: Run the web UI for Sonoteller analysis
-- `test`: Run tests in simulation mode
-- `help`: Show help message
-
-**Options**:
-- `--limit N`: Limit the number of items to process (default: 10)
-- `--simulate`: Run in simulation mode without making actual API calls
-- `--port N`: Port for the web UI (default: 5000)
-
-**Examples**:
-```batch
-run_angus.bat setup
-run_angus.bat upload --limit 5
-run_angus.bat comments --limit 10
-```
-
-### run_angus.sh (Unix-based systems)
-
-Shell script to run Agent Angus with common commands.
-
-**Usage**:
-```bash
-./run_angus.sh [command] [options]
-```
-
-**Commands**:
-- `setup`: Create the YouTube table in Supabase
-- `upload`: Upload pending songs to YouTube
-- `comments`: Fetch comments for uploaded videos
-- `daemon`: Run in daemon mode with scheduled tasks
-- `web`: Run the web UI for Sonoteller analysis
-- `test`: Run tests in simulation mode
-- `help`: Show help message
-
-**Options**:
-- `--limit N`: Limit the number of items to process (default: 10)
-- `--simulate`: Run in simulation mode without making actual API calls
-- `--port N`: Port for the web UI (default: 5000)
-
-**Examples**:
-```bash
-./run_angus.sh setup
-./run_angus.sh upload --limit 5
-./run_angus.sh comments --limit 10
-./run_angus.sh web --port 8080
+### test_angus.py
+Unit tests for Agent Angus using mocks to avoid making actual API calls.

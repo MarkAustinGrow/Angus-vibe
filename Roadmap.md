@@ -13,27 +13,27 @@ This will be an **agentic system**, allowing **Angus** to act autonomously, usin
 
 ## Phases
 
-1. **Initialize the Project**  
-2. **Create YouTube Table in Supabase**  
-3. **Implement YouTube Video Upload Tool**  
-4. **Implement YouTube Comment Retrieval Tool**  
-5. **Iteration & Refinement**
+1. **Initialize the Project** ✅  
+2. **Create YouTube Table in Supabase** ✅  
+3. **Implement YouTube Video Upload Tool** ✅  
+4. **Implement YouTube Comment Retrieval Tool** ✅  
+5. **Iteration & Refinement** 🔄
 
 ---
 
-## 1. Initialize the Project
+## 1. Initialize the Project ✅
 
-1. **Set Up Repo**  
+1. **Set Up Repo** ✅  
    - Create a new repository (e.g., GitHub or GitLab) to manage code, including:
      - `roadmap_angus.md` (this document)
      - Scripts for video upload and comment retrieval
      - Code for integrating with Supabase
 
-2. **Establish Local Dev Environment**  
+2. **Establish Local Dev Environment** ✅  
    - Use existing Python environment
    - Choose YouTube API library (e.g., `google-api-python-client`)
 
-3. **Install Required Dependencies**  
+3. **Install Required Dependencies** ✅  
    - For Python:
      ```bash
      pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client supabase
@@ -41,9 +41,9 @@ This will be an **agentic system**, allowing **Angus** to act autonomously, usin
 
 ---
 
-## 2. Create YouTube Table in Supabase
+## 2. Create YouTube Table in Supabase ✅
 
-1. **Design YouTube Table Schema**
+1. **Design YouTube Table Schema** ✅
 
    | Field Name      | Type        | Description                                  |
    |----------------|------------|----------------------------------------------|
@@ -57,7 +57,7 @@ This will be an **agentic system**, allowing **Angus** to act autonomously, usin
    | `view_count`   | `integer`   | Number of views (can be updated periodically) |
    | `like_count`   | `integer`   | Number of likes (can be updated periodically) |
 
-2. **Create Table in Supabase** (via SQL):
+2. **Create Table in Supabase** ✅ (via SQL):
    ```sql
    create table if not exists youtube (
      id uuid default uuid_generate_v4() primary key,
@@ -74,18 +74,18 @@ This will be an **agentic system**, allowing **Angus** to act autonomously, usin
 
 ---
 
-## 3. Implement YouTube Video Upload Tool
+## 3. Implement YouTube Video Upload Tool ✅
 
-1. **Create YouTube Authentication Module**
+1. **Create YouTube Authentication Module** ✅
    - Implement OAuth 2.0 authentication using the YouTube API credentials
    - Store tokens securely
 
-2. **Develop Video Upload Function**
+2. **Develop Video Upload Function** ✅
    - Create a function to upload videos to YouTube using the YouTube Data API v3
    - Use the video_url field from the songs table to download the video file
    - Use title, gpt_description, and other fields for YouTube metadata
 
-3. **Implement Upload Tracking**
+3. **Implement Upload Tracking** ✅
    - Record upload status in the youtube table
    - Handle success/failure scenarios
 
@@ -240,13 +240,13 @@ def upload_all_songs():
 
 ---
 
-## 4. Implement YouTube Comment Retrieval Tool
+## 4. Implement YouTube Comment Retrieval Tool ✅
 
-1. **Create Comment Fetching Function**
+1. **Create Comment Fetching Function** ✅
    - Develop a function to retrieve comments for uploaded videos
    - Store comments in a comments table with reference to the youtube table
 
-2. **Implement Periodic Comment Updates**
+2. **Implement Periodic Comment Updates** ✅
    - Set up a scheduler to periodically fetch new comments
 
 ### Python Script for Retrieving Comments
@@ -297,19 +297,19 @@ def fetch_comments_for_video(youtube_id):
 
 ---
 
-## 5. Iteration & Refinement
+## 5. Iteration & Refinement 🔄
 
-1. **Automate Angus' Workflow**  
-   - Implement daemon mode with continuous operation
-     - Add a scheduler to run tasks at specified intervals
-     - Implement proper logging for scheduled operations
-     - Add graceful shutdown handling
+1. **Automate Angus' Workflow** ✅  
+   - Implement daemon mode with continuous operation ✅
+     - Add a scheduler to run tasks at specified intervals ✅
+     - Implement proper logging for scheduled operations ✅
+     - Add graceful shutdown handling ✅
    
-   - **Optimize Hourly Video Upload**
-     - Upload exactly one video per hour (instead of up to 3)
-     - Implement a queue system to ensure videos are uploaded in the correct order
-     - Select the next video based on creation date (oldest first)
-     - Add detailed logging to track when each video is scheduled for upload
+   - **Optimize Hourly Video Upload** ✅
+     - Upload exactly one video per hour (instead of up to 3) ✅
+     - Implement a queue system to ensure videos are uploaded in the correct order ✅
+     - Select the next video based on creation date (oldest first) ✅
+     - Add detailed logging to track when each video is scheduled for upload ✅
      - Example implementation:
        ```python
        def youtube_upload_task():
@@ -322,10 +322,10 @@ def fetch_comments_for_video(youtube_id):
                logger.info("No pending videos to upload")
        ```
    
-   - **Strengthen Duplicate Upload Prevention**
-     - Implement robust SQL query to properly check for already uploaded videos
-     - Add a status field update mechanism to mark songs as "pending", "uploaded", or "failed"
-     - Create a verification step that checks YouTube for the video before marking as successfully uploaded
+   - **Strengthen Duplicate Upload Prevention** ✅
+     - Implement robust SQL query to properly check for already uploaded videos ✅
+     - Add a status field update mechanism to mark songs as "pending", "uploaded", or "failed" ✅
+     - Create a verification step that checks YouTube for the video before marking as successfully uploaded ✅
      - Example query:
        ```sql
        -- More robust query to find songs not yet uploaded
@@ -337,10 +337,10 @@ def fetch_comments_for_video(youtube_id):
        LIMIT 1
        ```
    
-   - **Improve Comment Collection Tracking**
-     - Enhance the processed_comments table schema to include more metadata
-     - Implement a more efficient comment comparison algorithm to ensure no duplicates
-     - Add periodic verification to check for comment consistency between YouTube and the database
+   - **Improve Comment Collection Tracking** ✅
+     - Enhance the processed_comments table schema to include more metadata ✅
+     - Implement a more efficient comment comparison algorithm to ensure no duplicates ✅
+     - Add periodic verification to check for comment consistency between YouTube and the database ✅
      - Example schema:
        ```sql
        CREATE TABLE IF NOT EXISTS processed_comments (
@@ -353,25 +353,30 @@ def fetch_comments_for_video(youtube_id):
        );
        ```
    
-   - Handle YouTube API rate limits and quotas
+   - Handle YouTube API rate limits and quotas ✅
 
-2. **Expand Functionality**  
-   - Add YouTube analytics tracking
-   - Implement comment sentiment analysis
+2. **Expand Functionality** 🔄  
+   - Add YouTube analytics tracking ⏳
+   - Implement comment sentiment analysis 🔄
 
-3. **Integrate with Other Agents**  
-   - Allow **Agent Yona** to analyze feedback and refine music
+3. **Integrate with Other Agents** ⏳  
+   - Allow **Agent Yona** to analyze feedback and refine music ⏳
 
-4. **Security & Access**  
-   - Protect API keys and credentials
+4. **Security & Access** ✅  
+   - Protect API keys and credentials ✅
 
 ---
 
 ## Summary
 
 This revised roadmap details how to:
-1. Upload existing songs from your Supabase database to YouTube
-2. Track uploaded videos in a new "youtube" table
-3. Retrieve and store YouTube comments for analysis
+1. Upload existing songs from your Supabase database to YouTube ✅
+2. Track uploaded videos in a new "youtube" table ✅
+3. Retrieve and store YouTube comments for analysis ✅
 
 The implementation will leverage your existing database structure and YouTube API credentials to create an autonomous publishing and feedback collection system.
+
+## Status Legend
+- ✅ Completed
+- 🔄 In Progress
+- ⏳ Pending
