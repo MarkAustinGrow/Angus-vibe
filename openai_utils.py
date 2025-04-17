@@ -6,6 +6,7 @@ This module provides functions for generating responses and analyzing music usin
 import os
 import json
 import logging
+import re
 from openai import OpenAI
 from typing import Optional, Dict, Any, Union
 
@@ -107,19 +108,14 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             Do not include any text outside of the JSON structure. Your entire response should be valid JSON.
             """
         
-        # Prepare API call parameters
+        # Prepare API call parameters - removed response_format parameter completely
         api_params = {
             "model": model,
             "messages": [
-                {"role": "system", "content": "You are a music analysis expert. Provide detailed analysis of music tracks in JSON format."},
+                {"role": "system", "content": "You are a music analysis expert. Your task is to analyze music and return ONLY valid JSON. Do not include any explanatory text outside the JSON structure."},
                 {"role": "user", "content": prompt}
             ]
         }
-        
-        # Add response_format parameter only for models that support it
-        # GPT-4 and GPT-3.5-turbo support it, but GPT-4o doesn't
-        if model in ["gpt-4", "gpt-3.5-turbo"]:
-            api_params["response_format"] = {"type": "json_object"}
         
         # Send to OpenAI
         logger.info(f"Sending request to OpenAI with model: {model}")
@@ -136,7 +132,6 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             logger.error(f"Response text: {analysis_text[:500]}...")
             
             # Try to extract JSON from the response if it contains additional text
-            import re
             json_match = re.search(r'({[\s\S]*})', analysis_text)
             if json_match:
                 try:
