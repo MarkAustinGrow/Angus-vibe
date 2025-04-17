@@ -634,7 +634,7 @@ for comment in comments:
 
 ### 4. OpenAI Utilities (openai_utils.py)
 
-The `openai_utils.py` module provides functions for generating responses using OpenAI.
+The `openai_utils.py` module provides functions for generating responses using OpenAI and analyzing music.
 
 #### Function: `generate_response`
 
@@ -666,6 +666,64 @@ else:
 ```
 
 **Error Handling**: Returns None if an error occurs during the API call.
+
+#### Function: `analyze_music`
+
+```python
+def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = "gpt-4o") -> Dict[str, Any]
+```
+
+**Description**: Analyze music using OpenAI. This function can analyze both YouTube videos and MP3 files, and generates detailed analysis including lyrics analysis, music analysis, and music creation parameters for the Nuro API.
+
+**Parameters**:
+- `input_source` (str): Either a path to an MP3 file or a YouTube URL
+- `is_youtube_url` (bool, optional): Whether the input_source is a YouTube URL. Defaults to False.
+- `model` (str, optional): OpenAI model to use. Defaults to "gpt-4o".
+
+**Returns**:
+- `Dict[str, Any]`: Dictionary with analysis results, including:
+  - `summary`: Brief summary of the lyrics
+  - `themes`: List of themes in the lyrics
+  - `moods`: List of moods in the lyrics
+  - `language`: Language of the lyrics
+  - `explicit`: Whether the lyrics contain explicit content
+  - `genres`: List of music genres
+  - `subgenres`: List of music subgenres
+  - `instruments`: List of instruments used
+  - `bpm`: Beats per minute
+  - `key`: Musical key
+  - `vocals`: Description of vocals
+  - `music_creation_params`: Parameters for the Nuro music creation API
+
+**Example**:
+```python
+# Analyze a YouTube video
+analysis = analyze_music("https://www.youtube.com/watch?v=VIDEO_ID", is_youtube_url=True)
+
+# Analyze an MP3 file
+analysis = analyze_music("/path/to/file.mp3")
+
+# Use a different model
+analysis = analyze_music("https://www.youtube.com/watch?v=VIDEO_ID", is_youtube_url=True, model="gpt-4")
+
+if analysis:
+    print(f"Summary: {analysis['summary']}")
+    print(f"Genres: {', '.join(analysis['genres'])}")
+    
+    # Access music creation parameters
+    if 'music_creation_params' in analysis:
+        params = analysis['music_creation_params']
+        print(f"Lyrics for music creation: {params['lyrics'][:100]}...")
+        print(f"Genre: {params['genre']}")
+        print(f"Mood: {params['mood']}")
+        print(f"Timbre: {params['timbre']}")
+        print(f"Duration: {params['duration']} seconds")
+```
+
+**Error Handling**:
+- Returns detailed error information if the API call fails
+- Handles JSON parsing errors by attempting to extract valid JSON from the response
+- Provides fallback values for music creation parameters if not specified by OpenAI
 
 ### 5. SonotellerClient (sonoteller_client.py)
 
@@ -795,22 +853,73 @@ run_web_ui(port=8080)
 
 #### Route: `/analyze`
 
-**Description**: Analyzes a music file using the Sonoteller API.
+**Description**: Analyzes a music file using OpenAI.
 
 **Method**: POST
 
 **Parameters**:
 - `url` (str): URL of the music file to analyze (.mp3)
-- `endpoint` (str, optional): API endpoint to use. Defaults to "lyrics_ddex".
+- `model` (str, optional): OpenAI model to use. Defaults to "gpt-4o".
 - `song_id` (str, optional): Optional song ID to associate with the analysis
 
-**Returns**: JSON response with analysis results.
+**Returns**: JSON response with analysis results and music creation parameters.
+
+**Example Response**:
+```json
+{
+  "success": true,
+  "analysis": {
+    "summary": "Brief summary of the lyrics",
+    "themes": ["theme1", "theme2"],
+    "moods": ["mood1", "mood2"],
+    "language": "English",
+    "explicit": "No",
+    "genres": ["Pop", "Electronic"],
+    "subgenres": ["Synth-pop", "Future Bass"],
+    "instruments": ["Synthesizer", "Drums", "Vocals"],
+    "bpm": "120",
+    "key": "C Major",
+    "vocals": "Female vocals with harmonies"
+  },
+  "music_creation_params": {
+    "type": "vocal",
+    "lyrics": "Sample lyrics for music creation...",
+    "gender": "Female",
+    "genre": "Pop",
+    "mood": "Happy",
+    "timbre": "Bright",
+    "duration": 120
+  },
+  "id": "uuid-of-saved-record"
+}
+```
 
 **Error Handling**:
 - Returns a 400 error if no URL is provided
 - Returns a 400 error if the URL is not an MP3
 - Returns a 500 error if the analysis fails
 - Stores the analysis in the influence_music table in Supabase
+- Extracts music_creation_params from the analysis result and includes them in the response
+
+#### Route: `/analyze_youtube`
+
+**Description**: Analyzes a YouTube video using OpenAI.
+
+**Method**: POST
+
+**Parameters**:
+- `url` (str): URL of the YouTube video to analyze
+- `model` (str, optional): OpenAI model to use. Defaults to "gpt-4o".
+- `song_id` (str, optional): Optional song ID to associate with the analysis
+
+**Returns**: JSON response with analysis results and music creation parameters.
+
+**Error Handling**:
+- Returns a 400 error if no URL is provided
+- Returns a 400 error if the URL is not a valid YouTube URL
+- Returns a 500 error if the analysis fails
+- Stores the analysis in the influence_music table in Supabase
+- Extracts music_creation_params from the analysis result and includes them in the response
 
 #### Route: `/save_parsed_analysis`
 
