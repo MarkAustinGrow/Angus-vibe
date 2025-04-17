@@ -22,13 +22,14 @@ logger = logging.getLogger(__name__)
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, Any]:
+def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = "gpt-4o") -> Dict[str, Any]:
     """
     Analyze music using OpenAI.
     
     Args:
         input_source: Either a path to an MP3 file or a YouTube URL
         is_youtube_url: Whether the input_source is a YouTube URL
+        model: OpenAI model to use (default: gpt-4o)
         
     Returns:
         Dictionary with analysis results
@@ -36,7 +37,7 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
     try:
         # Prepare the prompt based on the input type
         if is_youtube_url:
-            logger.info(f"Analyzing YouTube URL: {input_source}")
+            logger.info(f"Analyzing YouTube URL: {input_source} with model {model}")
             
             # Create a prompt for OpenAI to analyze the YouTube video
             prompt = f"""
@@ -48,7 +49,7 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
             1. Lyrics analysis (themes, moods, language, explicit content)
             2. Music analysis (genres, subgenres, instruments, BPM, key)
             
-            Format the response as a structured JSON object with these sections:
+            Your response MUST be a valid JSON object with this exact structure:
             {{
                 "lyrics_analysis": {{
                     "summary": "Brief summary of the lyrics",
@@ -66,11 +67,13 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
                     "vocals": "Description of vocals"
                 }}
             }}
+            
+            Do not include any text outside of the JSON structure. Your entire response should be valid JSON.
             """
         else:
             # For MP3 files, we have limited info
             title = os.path.basename(input_source)
-            logger.info(f"Analyzing MP3 file: {title}")
+            logger.info(f"Analyzing MP3 file: {title} with model {model}")
             
             # Create a prompt for OpenAI to analyze the MP3 file
             prompt = f"""
@@ -82,7 +85,7 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
             1. Lyrics analysis (themes, moods, language, explicit content)
             2. Music analysis (genres, subgenres, instruments, BPM, key)
             
-            Format the response as a structured JSON object with these sections:
+            Your response MUST be a valid JSON object with this exact structure:
             {{
                 "lyrics_analysis": {{
                     "summary": "Brief summary of the lyrics",
@@ -100,21 +103,59 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
                     "vocals": "Description of vocals"
                 }}
             }}
+            
+            Do not include any text outside of the JSON structure. Your entire response should be valid JSON.
             """
         
-        # Send to OpenAI
-        response = client.chat.completions.create(
-            model="gpt-4",  # Using GPT-4 for better analysis
-            messages=[
+        # Prepare API call parameters
+        api_params = {
+            "model": model,
+            "messages": [
                 {"role": "system", "content": "You are a music analysis expert. Provide detailed analysis of music tracks in JSON format."},
                 {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"}
-        )
+            ]
+        }
+        
+        # Add response_format parameter only for models that support it
+        # GPT-4 and GPT-3.5-turbo support it, but GPT-4o doesn't
+        if model in ["gpt-4", "gpt-3.5-turbo"]:
+            api_params["response_format"] = {"type": "json_object"}
+        
+        # Send to OpenAI
+        logger.info(f"Sending request to OpenAI with model: {model}")
+        response = client.chat.completions.create(**api_params)
         
         # Parse the response
         analysis_text = response.choices[0].message.content.strip()
-        analysis = json.loads(analysis_text)
+        
+        # Try to parse the JSON response
+        try:
+            analysis = json.loads(analysis_text)
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON response: {str(e)}")
+            logger.error(f"Response text: {analysis_text[:500]}...")
+            
+            # Try to extract JSON from the response if it contains additional text
+            import re
+            json_match = re.search(r'({[\s\S]*})', analysis_text)
+            if json_match:
+                try:
+                    analysis = json.loads(json_match.group(1))
+                    logger.info("Successfully extracted JSON from response")
+                except json.JSONDecodeError:
+                    # If still can't parse, return a structured error
+                    return {
+                        "error": "Failed to parse JSON response",
+                        "details": str(e),
+                        "raw_response": analysis_text[:1000]  # Include part of the response for debugging
+                    }
+            else:
+                # If no JSON-like structure found, return a structured error
+                return {
+                    "error": "Response did not contain valid JSON",
+                    "details": str(e),
+                    "raw_response": analysis_text[:1000]  # Include part of the response for debugging
+                }
                 
         # Format the analysis to match the expected structure
         formatted_analysis = {

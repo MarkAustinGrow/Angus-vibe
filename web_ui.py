@@ -187,6 +187,7 @@ def analyze():
     """Analyze a music file using OpenAI."""
     data = request.json
     url = data.get('url')
+    model = data.get('model', 'gpt-4o')  # Default to gpt-4o if not specified
     
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
@@ -198,8 +199,11 @@ def analyze():
             'details': 'Only MP3 URLs are supported. Please convert your media to MP3 format first.'
         }), 400
     
+    # Log the model being used
+    logger.info(f"Analyzing MP3 URL with model: {model}")
+    
     # Analyze the music using OpenAI
-    analysis = analyze_music(url, is_youtube_url=False)
+    analysis = analyze_music(url, is_youtube_url=False, model=model)
     
     # Check if there was an error in the analysis
     if 'error' in analysis:
@@ -235,6 +239,7 @@ def analyze_youtube():
     """Analyze a YouTube video using OpenAI."""
     data = request.json
     url = data.get('url')
+    model = data.get('model', 'gpt-4o')  # Default to gpt-4o if not specified
     
     if not url:
         return jsonify({'error': 'No YouTube URL provided'}), 400
@@ -246,8 +251,11 @@ def analyze_youtube():
             'details': 'Please provide a valid YouTube URL'
         }), 400
     
+    # Log the model being used
+    logger.info(f"Analyzing YouTube URL with model: {model}")
+    
     # Analyze the music using OpenAI
-    analysis = analyze_music(url, is_youtube_url=True)
+    analysis = analyze_music(url, is_youtube_url=True, model=model)
     
     # Check if there was an error in the analysis
     if 'error' in analysis:
