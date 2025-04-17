@@ -48,6 +48,12 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             Please provide a detailed analysis of the music in this video including:
             1. Lyrics analysis (themes, moods, language, explicit content)
             2. Music analysis (genres, subgenres, instruments, BPM, key)
+            3. Generate sample lyrics (max 2000 characters) inspired by this music
+            4. Recommend parameters for music creation:
+               - Genre (select one from: Folk, Pop, Rock, Chinese Style, Hip Hop/Rap, R&B/Soul, Punk, Electronic, Jazz, Reggae, DJ, Pop Punk, Disco, Future Bass, Pop Rap, Trap Rap, R&B Rap, Chinoiserie Electronic, GuFeng Music, Pop Rock, Jazz Pop, Bossa Nova, Contemporary R&B)
+               - Mood (select one from: Happy, Dynamic/Energetic, Sentimental/Melancholic/Lonely, Inspirational/Hopeful, Nostalgic/Memory, Excited, Sorrow/Sad, Chill, Romantic, Miss, Groovy/Funky, Dreamy/Ethereal, Calm/Relaxing)
+               - Timbre (select one from: Warm, Bright, Husky, Electrified voice, Sweet, Cute, Loud and sonorous, Powerful, Sexy/Lazy)
+               - Duration (recommend a duration between 30-240 seconds)
             
             Your response MUST be a valid JSON object with this exact structure:
             {{
@@ -65,6 +71,13 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
                     "bpm": "Estimated BPM",
                     "key": "Estimated key",
                     "vocals": "Description of vocals"
+                }},
+                "generated_lyrics": "Sample lyrics inspired by this music (max 2000 characters)",
+                "music_creation_params": {{
+                    "genre": "One genre from the allowed list",
+                    "mood": "One mood from the allowed list",
+                    "timbre": "One timbre from the allowed list",
+                    "duration": 120
                 }}
             }}
             
@@ -84,6 +97,12 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             Please provide a detailed analysis including:
             1. Lyrics analysis (themes, moods, language, explicit content)
             2. Music analysis (genres, subgenres, instruments, BPM, key)
+            3. Generate sample lyrics (max 2000 characters) inspired by this music
+            4. Recommend parameters for music creation:
+               - Genre (select one from: Folk, Pop, Rock, Chinese Style, Hip Hop/Rap, R&B/Soul, Punk, Electronic, Jazz, Reggae, DJ, Pop Punk, Disco, Future Bass, Pop Rap, Trap Rap, R&B Rap, Chinoiserie Electronic, GuFeng Music, Pop Rock, Jazz Pop, Bossa Nova, Contemporary R&B)
+               - Mood (select one from: Happy, Dynamic/Energetic, Sentimental/Melancholic/Lonely, Inspirational/Hopeful, Nostalgic/Memory, Excited, Sorrow/Sad, Chill, Romantic, Miss, Groovy/Funky, Dreamy/Ethereal, Calm/Relaxing)
+               - Timbre (select one from: Warm, Bright, Husky, Electrified voice, Sweet, Cute, Loud and sonorous, Powerful, Sexy/Lazy)
+               - Duration (recommend a duration between 30-240 seconds)
             
             Your response MUST be a valid JSON object with this exact structure:
             {{
@@ -101,6 +120,13 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
                     "bpm": "Estimated BPM",
                     "key": "Estimated key",
                     "vocals": "Description of vocals"
+                }},
+                "generated_lyrics": "Sample lyrics inspired by this music (max 2000 characters)",
+                "music_creation_params": {{
+                    "genre": "One genre from the allowed list",
+                    "mood": "One mood from the allowed list",
+                    "timbre": "One timbre from the allowed list",
+                    "duration": 120
                 }}
             }}
             
@@ -172,7 +198,17 @@ def analyze_music(input_source: str, is_youtube_url: bool = False, model: str = 
             "vocals": analysis.get("music_analysis", {}).get("vocals", ""),
             # Add DDEX format for compatibility with existing code
             "ddex moods": analysis.get("lyrics_analysis", {}).get("moods", []),
-            "ddex themes": analysis.get("lyrics_analysis", {}).get("themes", [])
+            "ddex themes": analysis.get("lyrics_analysis", {}).get("themes", []),
+            # Add music creation parameters for Nuro
+            "music_creation_params": {
+                "type": "vocal",  # Hard-coded as vocal
+                "lyrics": analysis.get("generated_lyrics", ""),
+                "gender": "Female",  # Hard-coded as Female
+                "genre": analysis.get("music_creation_params", {}).get("genre", "Pop"),  # Default to Pop if not specified
+                "mood": analysis.get("music_creation_params", {}).get("mood", "Happy"),  # Default to Happy if not specified
+                "timbre": analysis.get("music_creation_params", {}).get("timbre", "Warm"),  # Default to Warm if not specified
+                "duration": analysis.get("music_creation_params", {}).get("duration", 120)  # Default to 120 seconds if not specified
+            }
         }
         
         return formatted_analysis

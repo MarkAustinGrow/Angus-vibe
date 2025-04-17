@@ -185,29 +185,39 @@ def push_save_parsed_analysis():
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """Analyze a music file using OpenAI."""
-    data = request.json
-    url = data.get('url')
-    model = data.get('model', 'gpt-4o')  # Default to gpt-4o if not specified
-    
-    if not url:
-        return jsonify({'error': 'No URL provided'}), 400
-    
-    # Check if the URL is an MP3 URL
-    if not url.lower().endswith('.mp3'):
-        return jsonify({
-            'error': 'Unsupported file format',
-            'details': 'Only MP3 URLs are supported. Please convert your media to MP3 format first.'
-        }), 400
-    
-    # Log the model being used
-    logger.info(f"Analyzing MP3 URL with model: {model}")
-    
-    # Analyze the music using OpenAI
-    analysis = analyze_music(url, is_youtube_url=False, model=model)
-    
-    # Check if there was an error in the analysis
-    if 'error' in analysis:
-        return jsonify({'error': analysis['error'], 'details': analysis.get('details', '')}), 500
+    try:
+        data = request.json
+        url = data.get('url')
+        model = data.get('model', 'gpt-4o')  # Default to gpt-4o if not specified
+        
+        if not url:
+            return jsonify({'error': 'No URL provided'}), 400
+        
+        # Check if the URL is an MP3 URL
+        if not url.lower().endswith('.mp3'):
+            return jsonify({
+                'error': 'Unsupported file format',
+                'details': 'Only MP3 URLs are supported. Please convert your media to MP3 format first.'
+            }), 400
+        
+        # Log the model being used
+        logger.info(f"Analyzing MP3 URL with model: {model}")
+        
+        # Analyze the music using OpenAI
+        analysis = analyze_music(url, is_youtube_url=False, model=model)
+        
+        # Check if there was an error in the analysis
+        if 'error' in analysis:
+            return jsonify({'error': analysis['error'], 'details': analysis.get('details', '')}), 500
+        
+        # Extract music creation parameters if they exist in the response
+        music_creation_params = {}
+        if 'music_creation_params' in analysis:
+            music_creation_params = analysis.pop('music_creation_params')
+            logger.info(f"Extracted music creation parameters for URL: {url}")
+    except Exception as e:
+        logger.error(f"Unexpected error in analyze: {str(e)}")
+        return jsonify({'error': 'Server error', 'details': str(e)}), 500
     
     # Store the analysis in Supabase
     influence_data = {
@@ -226,7 +236,16 @@ def analyze():
         if response.data and len(response.data) > 0:
             influence_id = response.data[0].get('id')
             logger.info(f"Stored influence music analysis with ID: {influence_id}")
-            return jsonify({'success': True, 'analysis': analysis, 'id': influence_id})
+            # Include music_creation_params in the response if they exist
+            response_data = {
+                'success': True, 
+                'analysis': analysis, 
+                'id': influence_id
+            }
+            if music_creation_params:
+                response_data['music_creation_params'] = music_creation_params
+                logger.info("Including music creation parameters in response")
+            return jsonify(response_data)
         else:
             logger.error("No data returned from Supabase insert operation")
             return jsonify({'error': 'Failed to store analysis'}), 500
@@ -237,29 +256,45 @@ def analyze():
 @app.route('/analyze_youtube', methods=['POST'])
 def analyze_youtube():
     """Analyze a YouTube video using OpenAI."""
-    data = request.json
-    url = data.get('url')
-    model = data.get('model', 'gpt-4o')  # Default to gpt-4o if not specified
-    
-    if not url:
-        return jsonify({'error': 'No YouTube URL provided'}), 400
-    
-    # Validate YouTube URL (simple check)
-    if not ('youtube.com' in url or 'youtu.be' in url):
-        return jsonify({
-            'error': 'Invalid YouTube URL',
-            'details': 'Please provide a valid YouTube URL'
-        }), 400
-    
-    # Log the model being used
-    logger.info(f"Analyzing YouTube URL with model: {model}")
-    
-    # Analyze the music using OpenAI
-    analysis = analyze_music(url, is_youtube_url=True, model=model)
-    
-    # Check if there was an error in the analysis
-    if 'error' in analysis:
-        return jsonify({'error': analysis['error'], 'details': analysis.get('details', '')}), 500
+    try:
+        data = request.json
+        logger.info(f"Received analyze_youtube request with data: {data}")
+        
+        url = data.get('url')
+        model = data.get('model', 'gpt-4o')  # Default to gpt-4o if not specified
+        
+        if not url:
+            logger.error("No YouTube URL provided in request")
+            return jsonify({'error': 'No YouTube URL provided'}), 400
+        
+        # Validate YouTube URL (simple check)
+        if not ('youtube.com' in url or 'youtu.be' in url):
+            logger.error(f"Invalid YouTube URL: {url}")
+            return jsonify({
+                'error': 'Invalid YouTube URL',
+                'details': 'Please provide a valid YouTube URL'
+            }), 400
+        
+        # Log the model being used
+        logger.info(f"Analyzing YouTube URL: {url} with model: {model}")
+        
+        # Analyze the music using OpenAI
+        analysis = analyze_music(url, is_youtube_url=True, model=model)
+        logger.info(f"Analysis completed for YouTube URL: {url}")
+        
+        # Check if there was an error in the analysis
+        if 'error' in analysis:
+            logger.error(f"Error in analysis: {analysis['error']}, details: {analysis.get('details', '')}")
+            return jsonify({'error': analysis['error'], 'details': analysis.get('details', '')}), 500
+            
+        # Extract music creation parameters if they exist in the response
+        music_creation_params = {}
+        if 'music_creation_params' in analysis:
+            music_creation_params = analysis.pop('music_creation_params')
+            logger.info(f"Extracted music creation parameters for URL: {url}")
+    except Exception as e:
+        logger.error(f"Unexpected error in analyze_youtube: {str(e)}")
+        return jsonify({'error': 'Server error', 'details': str(e)}), 500
     
     # Store the analysis in Supabase
     influence_data = {
@@ -278,7 +313,16 @@ def analyze_youtube():
         if response.data and len(response.data) > 0:
             influence_id = response.data[0].get('id')
             logger.info(f"Stored YouTube music analysis with ID: {influence_id}")
-            return jsonify({'success': True, 'analysis': analysis, 'id': influence_id})
+            # Include music_creation_params in the response if they exist
+            response_data = {
+                'success': True, 
+                'analysis': analysis, 
+                'id': influence_id
+            }
+            if music_creation_params:
+                response_data['music_creation_params'] = music_creation_params
+                logger.info("Including music creation parameters in response")
+            return jsonify(response_data)
         else:
             logger.error("No data returned from Supabase insert operation")
             return jsonify({'error': 'Failed to store analysis'}), 500

@@ -560,6 +560,11 @@
                 // Format and display the results
                 formatAnalysisResults(data.analysis);
                 
+                // Display music creation parameters if they exist
+                if (data.music_creation_params) {
+                    displayMusicCreationParams(data.music_creation_params);
+                }
+                
                 // Also display the raw JSON
                 document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
                 document.getElementById('result').style.display = 'block';
@@ -620,6 +625,11 @@
                 // Format and display the results
                 formatAnalysisResults(data.analysis);
                 
+                // Display music creation parameters if they exist
+                if (data.music_creation_params) {
+                    displayMusicCreationParams(data.music_creation_params);
+                }
+                
                 // Also display the raw JSON
                 document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
                 document.getElementById('result').style.display = 'block';
@@ -629,6 +639,54 @@
                 showError('An error occurred: ' + error.message);
             }
         });
+        
+        // Function to display music creation parameters
+        function displayMusicCreationParams(params) {
+            const contentElement = document.getElementById('analysis-content');
+            
+            // Create a section for Music Creation Parameters
+            const creationSection = document.createElement('div');
+            creationSection.className = 'analysis-section';
+            creationSection.innerHTML = '<h2>Music Creation Parameters</h2>';
+            contentElement.appendChild(creationSection);
+            
+            // Create a pre element for the parameters
+            const paramsSection = document.createElement('div');
+            paramsSection.className = 'analysis-section';
+            
+            // Format the parameters as JSON
+            const formattedParams = JSON.stringify(params, null, 2);
+            
+            paramsSection.innerHTML = `
+                <h3>Parameters for musicapi.ai</h3>
+                <pre>${formattedParams}</pre>
+                <p>These parameters can be used with the musicapi.ai API to create a similar song.</p>
+            `;
+            
+            contentElement.appendChild(paramsSection);
+            
+            // Add a button to copy the parameters to clipboard
+            const copyButton = document.createElement('button');
+            copyButton.textContent = 'Copy Parameters';
+            copyButton.style.backgroundColor = '#4CAF50';
+            copyButton.style.color = 'white';
+            copyButton.style.marginTop = '10px';
+            
+            copyButton.addEventListener('click', () => {
+                navigator.clipboard.writeText(formattedParams)
+                    .then(() => {
+                        copyButton.textContent = 'Copied!';
+                        setTimeout(() => {
+                            copyButton.textContent = 'Copy Parameters';
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+            });
+            
+            paramsSection.appendChild(copyButton);
+        }
         
         function formatAnalysisResults(analysis) {
             const contentElement = document.getElementById('analysis-content');
