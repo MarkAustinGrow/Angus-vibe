@@ -77,6 +77,9 @@ Comprehensive CLI with options for:
 ### Deployment Options
 
 - **Docker Support**: Containerized deployment with Docker and docker-compose
+  - **Non-Interactive Authentication**: Special handling for YouTube authentication in Docker containers
+  - **File Path Compatibility**: Automatic handling of file paths between Windows and Linux environments
+  - **Utility Scripts**: Tools for updating file paths and managing authentication tokens
 - **Environment Configuration**: Configurable through environment variables
 - **Cross-Platform Support**: Windows batch files and Unix shell scripts for easy execution
 
@@ -135,7 +138,12 @@ Comprehensive CLI with options for:
 ### YouTube Integration
 
 - OAuth 2.0 authentication for secure API access
+  - **Interactive Authentication**: Standard OAuth flow for development environments
+  - **Non-Interactive Mode**: Token-based authentication for server environments
+  - **Authentication Tools**: Scripts for generating and transferring authentication tokens
 - Video upload with metadata
+  - **Remote URL Support**: Upload videos from remote URLs
+  - **Local File Support**: Upload videos from local files with path compatibility across platforms
 - Comment retrieval and filtering
 - Comment reply posting
 
