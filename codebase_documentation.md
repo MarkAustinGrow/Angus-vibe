@@ -8,7 +8,7 @@ Agent Angus is an AI agent that automates YouTube publishing and audience feedba
 2. Tracks uploaded videos in a YouTube table in Supabase
 3. Retrieves and stores YouTube comments in the Supabase database for analysis
 4. Responds to YouTube comments using OpenAI-generated responses
-5. Analyzes music using the Sonoteller API and stores results in Supabase
+5. Analyzes music using the OpenAI API and stores results in Supabase
 
 ## System Architecture
 
@@ -17,9 +17,11 @@ Agent Angus consists of several key components that work together:
 1. **Main Agent (angus.py)**: Orchestrates the entire system, handling command-line arguments, scheduling tasks, and coordinating between components.
 2. **Supabase Client (supabase_client.py)**: Manages database operations with Supabase, including storing video information and comments.
 3. **YouTube Client (youtube_client.py)**: Handles all interactions with the YouTube API, including video uploads, comment fetching, and comment replies.
-4. **OpenAI Utilities (openai_utils.py)**: Generates responses to YouTube comments using OpenAI's API.
-5. **Sonoteller Client (sonoteller_client.py)**: Handles interactions with the Sonoteller API for music analysis.
-6. **Web UI (web_ui.py)**: Provides a web interface for analyzing music using the Sonoteller API.
+4. **OpenAI Utilities (openai_utils.py)**: Provides two key functions:
+   - Generates responses to YouTube comments using OpenAI's API
+   - Analyzes music using OpenAI's API to extract insights about lyrics, mood, themes, and musical characteristics
+5. **Sonoteller Client (sonoteller_client.py)**: [DEPRECATED] Previously handled interactions with the Sonoteller API for music analysis. Retained for reference but no longer used.
+6. **Web UI (web_ui.py)**: Provides a web interface for analyzing music using the OpenAI API.
 7. **Database Schema (create_youtube_table.sql)**: Defines the structure of the YouTube table in Supabase.
 8. **Test Scripts**: Various scripts to test different aspects of the system.
 
@@ -280,7 +282,7 @@ if __name__ == "__main__":
 - `--limit`: Limit the number of items to process (default: 1)
 - `--max-replies`: Maximum number of comment replies to post (default: 10)
 - `--daemon`: Run in daemon mode with scheduled tasks
-- `--web`: Run the web UI for Sonoteller analysis
+- `--web`: Run the web UI for music analysis
 - `--port`: Port for the web UI (default: 5000)
 
 ### 2. SupabaseClient (supabase_client.py)
@@ -727,7 +729,7 @@ if analysis:
 
 ### 5. SonotellerClient (sonoteller_client.py)
 
-The `SonotellerClient` class handles all interactions with the Sonoteller API for music analysis.
+**[DEPRECATED]** The `SonotellerClient` class previously handled interactions with the Sonoteller API for music analysis. This component is retained for reference but is no longer used in the application, as music analysis is now performed using the OpenAI API through the `analyze_music` function in `openai_utils.py`.
 
 #### Class: `SonotellerClient`
 
@@ -804,7 +806,7 @@ else:
 
 ### 6. Web UI (web_ui.py)
 
-The `web_ui.py` module provides a web interface for analyzing music using the Sonoteller API.
+The `web_ui.py` module provides a web interface for analyzing music using the OpenAI API.
 
 #### Function: `run_web_ui`
 
@@ -812,7 +814,7 @@ The `web_ui.py` module provides a web interface for analyzing music using the So
 def run_web_ui(host='0.0.0.0', port=5000, debug=False)
 ```
 
-**Description**: Run the web UI for Sonoteller analysis.
+**Description**: Run the web UI for music analysis.
 
 **Parameters**:
 - `host` (str, optional): Host to bind to. Defaults to '0.0.0.0'.
@@ -1071,7 +1073,7 @@ comment on table youtube is 'Tracks videos uploaded to YouTube from the songs ta
 
 ### Influence Music Table
 
-The Influence Music table stores Sonoteller analysis results:
+The Influence Music table stores music analysis results:
 
 ```sql
 create table if not exists influence_music (
@@ -1086,7 +1088,7 @@ create table if not exists influence_music (
 create index if not exists influence_music_song_id_idx on influence_music(song_id);
 
 -- Add comment to explain table purpose
-comment on table influence_music is 'Stores Sonoteller analysis results for influence music';
+comment on table influence_music is 'Stores music analysis results for influence music';
 ```
 
 | Field Name      | Type        | Description                                  |
@@ -1094,7 +1096,7 @@ comment on table influence_music is 'Stores Sonoteller analysis results for infl
 | `id` (PK)      | `uuid`      | Unique ID, primary key (auto-generated)     |
 | `song_id`      | `uuid`      | Reference to songs table (optional)         |
 | `url`          | `text`      | URL of the analyzed music file              |
-| `analysis`     | `jsonb`     | JSON data with Sonoteller analysis results  |
+| `analysis`     | `jsonb`     | JSON data with OpenAI analysis results      |
 | `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
 
 ## Test Scripts

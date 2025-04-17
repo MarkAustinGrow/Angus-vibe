@@ -22,14 +22,14 @@ Agent Angus is an AI-powered automation system for YouTube publishing and audien
 
 ### 3. Music Analysis
 
-- **Sonoteller API Integration**: Analyzes music files to extract insights about lyrics, mood, themes, and musical characteristics
-- **Multiple Analysis Types**: Supports various analysis endpoints including lyrics_ddex, music_ddex, lyrics, and music
+- **OpenAI API Integration**: Analyzes music files to extract insights about lyrics, mood, themes, and musical characteristics
+- **Comprehensive Analysis**: Generates detailed analysis of lyrics, musical elements, and suggested music creation parameters
 - **Analysis Storage**: Stores analysis results in the Supabase database for future reference
 - **YouTube Audio Extraction**: Can extract audio from YouTube videos for analysis
 
 ### 4. Web Interface
 
-- **Music Analysis UI**: Web interface for analyzing music using the Sonoteller API
+- **Music Analysis UI**: Web interface for analyzing music using the OpenAI API
 - **File Upload Support**: Allows uploading MP3 files for analysis
 - **URL-based Analysis**: Supports analysis of music files via direct URLs
 - **Analysis Visualization**: Displays analysis results in a user-friendly format
@@ -61,8 +61,7 @@ Stores music analysis results with the following fields:
 ### API Integrations
 
 - **YouTube API**: OAuth 2.0 authentication for video uploads, comment retrieval, and comment replies
-- **OpenAI API**: For generating contextual responses to YouTube comments
-- **Sonoteller API**: For music and lyrics analysis
+- **OpenAI API**: For generating contextual responses to YouTube comments and comprehensive music analysis
 
 ### Command-Line Interface
 
@@ -142,11 +141,8 @@ Comprehensive CLI with options for:
 ### OpenAI Integration
 
 - Contextual response generation for YouTube comments
+- Comprehensive music analysis including lyrics, genre, mood, and musical characteristics
+- Generation of music creation parameters for potential integration with music generation APIs
+- Support for both YouTube URLs and direct MP3 files
 - Customizable system prompts based on song information
-- Error handling for API failures
-
-### Sonoteller Integration
-
-- Multiple analysis endpoints for different types of analysis
-- Support for direct MP3 URLs
 - Detailed error reporting for API failures

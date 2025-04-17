@@ -161,6 +161,28 @@ The multi-comment reply capability ensures that:
 
 This feature helps engage with your audience automatically and provides a way to track which comments have been processed.
 
+### OpenAI-Powered Music Analysis
+Agent Angus uses OpenAI to analyze music files and extract detailed insights. The system:
+- Analyzes both MP3 files and YouTube videos
+- Extracts information about lyrics, mood, themes, and musical characteristics
+- Identifies genres, subgenres, instruments, BPM, and musical key
+- Generates sample lyrics inspired by the music
+- Creates music creation parameters for potential integration with music generation APIs
+- Stores analysis results in the Supabase database
+
+The web interface provides a user-friendly way to:
+- Upload MP3 files for analysis
+- Analyze music from YouTube URLs
+- View formatted analysis results
+- Access raw JSON data for further processing
+
+To use the music analysis feature:
+```bash
+python angus.py --web --port 5000
+```
+
+This will start the web UI on port 5000, allowing you to analyze music through your browser.
+
 ## Database Schema
 
 ### YouTube Table

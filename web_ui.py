@@ -164,11 +164,15 @@ def save_parsed_analysis():
     # Make sure the title is not too long (max 50 chars)
     title = title[:50]
     
-    # Store the title in the url field, and the actual URL in the analysis
+    # Store the URL in the url field, and ensure title is in the analysis
     influence_data = {
-        'url': title,  # Store the title in the url field
+        'url': url,  # Store the actual URL in the url field
         'analysis': analysis
     }
+    
+    # Make sure the title is stored in the analysis
+    if 'title' not in analysis:
+        analysis['title'] = title
     
     # Make sure the original URL is stored in the analysis
     if 'original_url' not in analysis:
@@ -247,11 +251,15 @@ def analyze():
     # Make sure the title is not too long (max 50 chars)
     title = title[:50]
     
-    # Store the title in the url field, and the actual URL in the analysis
+    # Store the URL in the url field, and ensure title is in the analysis
     influence_data = {
-        'url': title,  # Store the title in the url field
+        'url': url,  # Store the actual URL in the url field
         'analysis': analysis
     }
+    
+    # Make sure the title is stored in the analysis
+    if 'title' not in analysis:
+        analysis['title'] = title
     
     # Make sure the original URL is stored in the analysis
     if 'original_url' not in analysis:
@@ -340,11 +348,15 @@ def analyze_youtube():
     # Make sure the title is not too long (max 50 chars)
     title = title[:50]
     
-    # Store the title in the url field, and the actual URL in the analysis
+    # Store the URL in the url field, and ensure title is in the analysis
     influence_data = {
-        'url': title,  # Store the title in the url field
+        'url': url,  # Store the actual URL in the url field
         'analysis': analysis
     }
+    
+    # Make sure the title is stored in the analysis
+    if 'title' not in analysis:
+        analysis['title'] = title
     
     # Make sure the original URL is stored in the analysis
     if 'original_url' not in analysis:
