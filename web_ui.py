@@ -23,7 +23,7 @@ from supabase_client import SupabaseClient
 from openai_utils import analyze_music
 
 # Initialize Flask app
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # Set up URL prefix for the push endpoint
 URL_PREFIX = '/push'
