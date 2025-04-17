@@ -94,6 +94,16 @@ def serve_static(filename):
     """Serve static files."""
     return send_from_directory('static', filename)
 
+@app.route('/test')
+def test_page():
+    """Serve the test HTML page."""
+    return send_from_directory('static', 'test.html')
+
+@app.route(f'{URL_PREFIX}/test')
+def push_test_page():
+    """Serve the test HTML page for the push endpoint."""
+    return send_from_directory('static', 'test.html')
+
 @app.route(f'{URL_PREFIX}/static/<path:filename>')
 def push_static(filename):
     """Serve static files for the push endpoint."""
