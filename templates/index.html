@@ -4,6 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Angus - Music Analysis</title>
+    <!-- Inline JavaScript test to see if JavaScript is running at all -->
+    <script>
+        // This will run as soon as the page loads
+        window.onload = function() {
+            // Create a visible indicator that JavaScript is running
+            var jsIndicator = document.createElement('div');
+            jsIndicator.style.position = 'fixed';
+            jsIndicator.style.top = '10px';
+            jsIndicator.style.right = '10px';
+            jsIndicator.style.padding = '5px 10px';
+            jsIndicator.style.backgroundColor = 'green';
+            jsIndicator.style.color = 'white';
+            jsIndicator.style.fontWeight = 'bold';
+            jsIndicator.style.zIndex = '9999';
+            jsIndicator.textContent = 'JS Running';
+            document.body.appendChild(jsIndicator);
+            
+            // Try to get the YouTube button and change its text
+            setTimeout(function() {
+                try {
+                    var ytButton = document.getElementById('analyze-youtube-btn');
+                    if (ytButton) {
+                        ytButton.textContent = 'Click to Analyze YouTube (JS Working)';
+                        ytButton.style.backgroundColor = '#ff5500';
+                    } else {
+                        jsIndicator.textContent = 'JS Running but button not found';
+                        jsIndicator.style.backgroundColor = 'orange';
+                    }
+                } catch (e) {
+                    jsIndicator.textContent = 'JS Error: ' + e.message;
+                    jsIndicator.style.backgroundColor = 'red';
+                }
+            }, 1000);
+        };
+    </script>
     <style>
         :root {
             /* Colors from Angus character */
@@ -329,10 +364,10 @@
             </div>
             
             <div>
-                <button id="analyze-youtube-btn">Analyze YouTube</button>
-                <button id="analyze-btn">Analyze MP3</button>
-                <button id="parse-btn">Parse Pasted Analysis</button>
-                <button id="save-btn" style="display: none;">Save to Database</button>
+                <button id="analyze-youtube-btn" onclick="analyzeYoutube()">Analyze YouTube</button>
+                <button id="analyze-btn" onclick="analyzeMP3()">Analyze MP3</button>
+                <button id="parse-btn" onclick="parseAnalysis()">Parse Pasted Analysis</button>
+                <button id="save-btn" style="display: none;" onclick="saveToDatabase()">Save to Database</button>
             </div>
             
             <div class="loading" id="loading">
@@ -1185,6 +1220,252 @@
             
             errorElement.innerHTML = errorHTML;
             errorElement.style.display = 'block';
+        }
+
+        // Function definitions for onclick handlers
+        function analyzeYoutube() {
+            console.log('analyzeYoutube function called directly');
+            alert('analyzeYoutube function called!');
+            
+            const url = document.getElementById('youtube-url').value.trim();
+            if (!url) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+            
+            if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+                showError('Please enter a valid YouTube URL');
+                return;
+            }
+            
+            // Change button color to indicate it was clicked
+            const button = document.getElementById('analyze-youtube-btn');
+            const originalColor = button.style.backgroundColor;
+            button.style.backgroundColor = '#ff0000';
+            button.textContent = 'Processing...';
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Analyzing YouTube video... This may take a moment.';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            
+            // Get the selected model
+            const model = document.getElementById('model-select').value;
+            
+            // Use fetch with a timeout
+            const fetchPromise = fetch('/analyze_youtube', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    url,
+                    model
+                })
+            });
+            
+            // Set a timeout of 30 seconds
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timed out')), 30000);
+            });
+            
+            // Race the fetch against the timeout
+            Promise.race([fetchPromise, timeoutPromise])
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Server responded with status: ${response.status} ${response.statusText}. Details: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Hide loading indicator
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    if (data.error) {
+                        showError(data.error, data.details);
+                        return;
+                    }
+                    
+                    // Format and display the results
+                    formatAnalysisResults(data.analysis);
+                    
+                    // Display music creation parameters if they exist
+                    if (data.music_creation_params) {
+                        displayMusicCreationParams(data.music_creation_params);
+                    }
+                    
+                    // Also display the raw JSON
+                    document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
+                    document.getElementById('result').style.display = 'block';
+                })
+                .catch(error => {
+                    document.getElementById('loading').style.display = 'none';
+                    showError('An error occurred: ' + error.message);
+                })
+                .finally(() => {
+                    // Reset button
+                    button.style.backgroundColor = originalColor;
+                    button.textContent = 'Analyze YouTube';
+                });
+        }
+        
+        function analyzeMP3() {
+            const url = document.getElementById('music-url').value.trim();
+            
+            if (!url) {
+                showError('Please enter a URL or upload a file');
+                return;
+            }
+            
+            if (!url.toLowerCase().endsWith('.mp3')) {
+                showError('Only MP3 URLs are supported.');
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Analyzing MP3... This may take a moment.';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            
+            // Get the selected model
+            const model = document.getElementById('model-select').value;
+            
+            fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    url,
+                    model
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server responded with status: ${response.status} ${response.statusText}. Details: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError(data.error, data.details, data.raw_response);
+                    return;
+                }
+                
+                // Format and display the results
+                formatAnalysisResults(data.analysis);
+                
+                // Also display the raw JSON
+                document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
+                document.getElementById('result').style.display = 'block';
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError('An error occurred: ' + error.message);
+            });
+        }
+        
+        function parseAnalysis() {
+            const analysisText = document.getElementById('analysis-text').value.trim();
+            
+            if (!analysisText) {
+                showError('Please paste the analysis text first');
+                return;
+            }
+            
+            try {
+                // Parse the pasted analysis text
+                const parsedAnalysis = parseAnalysisText(analysisText);
+                
+                // Store the parsed analysis in the global variable
+                currentAnalysis = parsedAnalysis;
+                
+                // Hide any previous errors
+                document.getElementById('error').style.display = 'none';
+                
+                // Format and display the results
+                formatAnalysisResults(parsedAnalysis);
+                
+                // Also display the raw JSON
+                document.getElementById('analysis-json').textContent = JSON.stringify(parsedAnalysis, null, 2);
+                document.getElementById('result').style.display = 'block';
+                
+                // Show the Save to Database button
+                document.getElementById('save-btn').style.display = 'inline-block';
+                
+            } catch (error) {
+                showError('Failed to parse analysis text: ' + error.message);
+            }
+        }
+        
+        function saveToDatabase() {
+            if (!currentAnalysis) {
+                showError('No analysis to save. Please parse the analysis text first.');
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Saving to database...';
+            document.getElementById('error').style.display = 'none';
+            
+            fetch('/save_parsed_analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    analysis: currentAnalysis
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server responded with status: ${response.status} ${response.statusText}. Details: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError('Failed to save analysis: ' + data.error);
+                    return;
+                }
+                
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.style.color = '#40C4AA';
+                successMessage.style.marginTop = '10px';
+                successMessage.style.padding = '10px';
+                successMessage.style.backgroundColor = 'rgba(64, 196, 170, 0.1)';
+                successMessage.style.borderRadius = '4px';
+                successMessage.innerHTML = `<strong>Analysis saved successfully with ID: ${data.id}</strong>`;
+                
+                // Insert the success message after the Save button
+                const saveBtn = document.getElementById('save-btn');
+                saveBtn.parentNode.insertBefore(successMessage, saveBtn.nextSibling);
+                
+                // Hide the success message after 5 seconds
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 5000);
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError('An error occurred while saving: ' + error.message);
+            });
         }
 
         // Add this at the end of the file to check if the button and event listener are properly initialized
