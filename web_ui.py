@@ -26,6 +26,9 @@ from config import SONOTELLER_API_KEY
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
 
+# Set up URL prefix for the push endpoint
+URL_PREFIX = '/push'
+
 # Initialize clients
 supabase = SupabaseClient()
 sonoteller = SonotellerClient(SONOTELLER_API_KEY)
@@ -81,9 +84,19 @@ def index():
     """Render the main page."""
     return render_template('index.html')
 
+@app.route(f'{URL_PREFIX}/')
+def push_index():
+    """Render the main page for the push endpoint."""
+    return render_template('index.html')
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     """Serve uploaded files."""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route(f'{URL_PREFIX}/uploads/<filename>')
+def push_uploaded_file(filename):
+    """Serve uploaded files for the push endpoint."""
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/upload', methods=['POST'])
@@ -122,6 +135,11 @@ def upload_file():
         'url': file_url
     })
 
+@app.route(f'{URL_PREFIX}/upload', methods=['POST'])
+def push_upload_file():
+    """Upload a file and return its URL for the push endpoint."""
+    return upload_file()
+
 @app.route('/save_parsed_analysis', methods=['POST'])
 def save_parsed_analysis():
     """Save parsed Sonoteller analysis to the database."""
@@ -158,6 +176,11 @@ def save_parsed_analysis():
     except Exception as e:
         logger.error(f"Error storing analysis: {str(e)}")
         return jsonify({'error': f'Failed to store analysis: {str(e)}'}), 500
+
+@app.route(f'{URL_PREFIX}/save_parsed_analysis', methods=['POST'])
+def push_save_parsed_analysis():
+    """Save parsed Sonoteller analysis to the database for the push endpoint."""
+    return save_parsed_analysis()
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
@@ -216,10 +239,16 @@ def analyze():
         logger.error(f"Error storing analysis: {str(e)}")
         return jsonify({'error': f'Failed to store analysis: {str(e)}'}), 500
 
+@app.route(f'{URL_PREFIX}/analyze', methods=['POST'])
+def push_analyze():
+    """Analyze a music file using Sonoteller API for the push endpoint."""
+    return analyze()
+
 def run_web_ui(host='0.0.0.0', port=5000, debug=False):
     """Run the web UI."""
     # Create templates directory if it doesn't exist
     os.makedirs('templates', exist_ok=True)
     
     logger.info(f"Starting web UI on http://{host}:{port}")
+    logger.info(f"Push endpoint available at http://{host}:{port}{URL_PREFIX}/")
     app.run(host=host, port=port, debug=debug)
