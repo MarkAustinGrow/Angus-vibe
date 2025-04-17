@@ -89,6 +89,11 @@ def push_index():
     """Render the main page for the push endpoint."""
     return render_template('index.html')
 
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files."""
+    return send_from_directory('static', filename)
+
 @app.route(f'{URL_PREFIX}/static/<path:filename>')
 def push_static(filename):
     """Serve static files for the push endpoint."""
