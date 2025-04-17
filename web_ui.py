@@ -2,7 +2,7 @@
 Web UI module for Agent Angus.
 
 This module provides a web interface for interacting with Agent Angus,
-including a UI for analyzing music using the Sonoteller API.
+including a UI for analyzing music using the OpenAI API.
 """
 import os
 import logging
@@ -19,9 +19,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import custom modules
-from sonoteller_client import SonotellerClient
 from supabase_client import SupabaseClient
-from config import SONOTELLER_API_KEY
+from openai_utils import analyze_music
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates')
@@ -31,7 +30,6 @@ URL_PREFIX = '/push'
 
 # Initialize clients
 supabase = SupabaseClient()
-sonoteller = SonotellerClient(SONOTELLER_API_KEY)
 
 # Configure upload settings
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -184,15 +182,12 @@ def push_save_parsed_analysis():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    """Analyze a music file using Sonoteller API."""
+    """Analyze a music file using OpenAI."""
     data = request.json
     url = data.get('url')
     
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
-    
-    # Get additional parameters
-    endpoint = data.get('endpoint', 'lyrics_ddex')  # Default to lyrics_ddex
     
     # Check if the URL is an MP3 URL
     if not url.lower().endswith('.mp3'):
@@ -201,18 +196,12 @@ def analyze():
             'details': 'Only MP3 URLs are supported. Please convert your media to MP3 format first.'
         }), 400
     
-    # Analyze the music
-    analysis = sonoteller.analyze_music(
-        url, 
-        endpoint=endpoint
-    )
-    
-    if not analysis:
-        return jsonify({'error': 'Failed to analyze music'}), 500
+    # Analyze the music using OpenAI
+    analysis = analyze_music(url, is_youtube_url=False)
     
     # Check if there was an error in the analysis
     if 'error' in analysis:
-        return jsonify({'error': analysis['error'], 'details': analysis.get('details', ''), 'raw_response': analysis.get('raw_response', '')}), 500
+        return jsonify({'error': analysis['error'], 'details': analysis.get('details', '')}), 500
     
     # Store the analysis in Supabase
     influence_data = {
@@ -239,10 +228,63 @@ def analyze():
         logger.error(f"Error storing analysis: {str(e)}")
         return jsonify({'error': f'Failed to store analysis: {str(e)}'}), 500
 
+@app.route('/analyze_youtube', methods=['POST'])
+def analyze_youtube():
+    """Analyze a YouTube video using OpenAI."""
+    data = request.json
+    url = data.get('url')
+    
+    if not url:
+        return jsonify({'error': 'No YouTube URL provided'}), 400
+    
+    # Validate YouTube URL (simple check)
+    if not ('youtube.com' in url or 'youtu.be' in url):
+        return jsonify({
+            'error': 'Invalid YouTube URL',
+            'details': 'Please provide a valid YouTube URL'
+        }), 400
+    
+    # Analyze the music using OpenAI
+    analysis = analyze_music(url, is_youtube_url=True)
+    
+    # Check if there was an error in the analysis
+    if 'error' in analysis:
+        return jsonify({'error': analysis['error'], 'details': analysis.get('details', '')}), 500
+    
+    # Store the analysis in Supabase
+    influence_data = {
+        'url': url,
+        'analysis': analysis
+    }
+    
+    # If a song_id was provided, associate the analysis with that song
+    song_id = data.get('song_id')
+    if song_id:
+        influence_data['song_id'] = song_id
+    
+    # Store in Supabase
+    try:
+        response = supabase.client.table("influence_music").insert(influence_data).execute()
+        if response.data and len(response.data) > 0:
+            influence_id = response.data[0].get('id')
+            logger.info(f"Stored YouTube music analysis with ID: {influence_id}")
+            return jsonify({'success': True, 'analysis': analysis, 'id': influence_id})
+        else:
+            logger.error("No data returned from Supabase insert operation")
+            return jsonify({'error': 'Failed to store analysis'}), 500
+    except Exception as e:
+        logger.error(f"Error storing analysis: {str(e)}")
+        return jsonify({'error': f'Failed to store analysis: {str(e)}'}), 500
+
 @app.route(f'{URL_PREFIX}/analyze', methods=['POST'])
 def push_analyze():
-    """Analyze a music file using Sonoteller API for the push endpoint."""
+    """Analyze a music file using OpenAI for the push endpoint."""
     return analyze()
+
+@app.route(f'{URL_PREFIX}/analyze_youtube', methods=['POST'])
+def push_analyze_youtube():
+    """Analyze a YouTube video using OpenAI for the push endpoint."""
+    return analyze_youtube()
 
 def run_web_ui(host='0.0.0.0', port=5000, debug=False):
     """Run the web UI."""

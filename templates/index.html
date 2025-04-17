@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Angus - Push Analysis</title>
+    <title>Agent Angus - Music Analysis</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -121,7 +121,15 @@
     </style>
 </head>
 <body>
-    <h1>Agent Angus - Push Analysis</h1>
+    <h1>Agent Angus - Music Analysis</h1>
+    
+    <div class="form-group">
+        <label for="youtube-url">Enter YouTube URL:</label>
+        <input type="text" id="youtube-url" placeholder="Enter YouTube video URL">
+        <small class="text-muted">Enter a YouTube video URL to analyze the music.</small>
+    </div>
+    
+    <div class="url-or">OR</div>
     
     <div class="form-group">
         <label>Upload MP3 File:</label>
@@ -143,22 +151,13 @@
     <div class="url-or">OR</div>
     
     <div class="form-group">
-        <label for="analysis-text">Paste Push Analysis:</label>
-        <textarea id="analysis-text" rows="10" style="width: 100%; padding: 8px;" placeholder="Paste the analysis text from Push website here..."></textarea>
+        <label for="analysis-text">Paste Analysis:</label>
+        <textarea id="analysis-text" rows="10" style="width: 100%; padding: 8px;" placeholder="Paste the analysis text here..."></textarea>
         <small class="text-muted">Paste the complete analysis text including LYRICS ANALYSIS and MUSIC ANALYSIS sections.</small>
     </div>
     
-    <div class="form-group">
-        <label for="endpoint">Analysis Type:</label>
-        <select id="endpoint" class="form-control">
-            <option value="lyrics_ddex" selected>Lyrics DDEX (Default)</option>
-            <option value="music_ddex">Music DDEX</option>
-            <option value="lyrics">Lyrics</option>
-            <option value="music">Music</option>
-        </select>
-    </div>
-    
-    <button id="analyze-btn">Analyze Influence Track</button>
+    <button id="analyze-youtube-btn">Analyze YouTube</button>
+    <button id="analyze-btn">Analyze MP3</button>
     <button id="parse-btn">Parse Pasted Analysis</button>
     <button id="save-btn" style="display: none;">Save to Database</button>
     
@@ -497,10 +496,67 @@
             return analysis;
         }
         
-        // Analyze button click handler
+        // Initialize YouTube URL input
+        const youtubeUrlInput = document.getElementById('youtube-url');
+        const analyzeYoutubeBtn = document.getElementById('analyze-youtube-btn');
+        
+        // Analyze YouTube button click handler
+        analyzeYoutubeBtn.addEventListener('click', async () => {
+            const url = youtubeUrlInput.value.trim();
+            
+            if (!url) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+            
+            // Simple validation for YouTube URL
+            if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+                showError('Please enter a valid YouTube URL');
+                return;
+            }
+            
+            // Show loading indicator
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Analyzing YouTube video... This may take a moment.';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            
+            try {
+                // Use a relative path that works with both root and /push
+                const response = await fetch('analyze_youtube', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError(data.error, data.details);
+                    return;
+                }
+                
+                // Format and display the results
+                formatAnalysisResults(data.analysis);
+                
+                // Also display the raw JSON
+                document.getElementById('analysis-json').textContent = JSON.stringify(data.analysis, null, 2);
+                document.getElementById('result').style.display = 'block';
+                
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                showError('An error occurred: ' + error.message);
+            }
+        });
+        
+        // Analyze MP3 button click handler
         analyzeBtn.addEventListener('click', async () => {
             const url = musicUrlInput.value.trim();
-            const endpoint = document.getElementById('endpoint').value;
             
             if (!url) {
                 showError('Please enter a URL or upload a file');
@@ -515,6 +571,7 @@
             
             // Show loading indicator
             document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = 'Analyzing MP3... This may take a moment.';
             document.getElementById('error').style.display = 'none';
             document.getElementById('result').style.display = 'none';
             
@@ -525,10 +582,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ 
-                        url,
-                        endpoint
-                    })
+                    body: JSON.stringify({ url })
                 });
                 
                 const data = await response.json();
