@@ -485,7 +485,8 @@ The `YouTubeClient` class handles all interactions with the YouTube API.
 
 ```python
 def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None, 
-             api_key: Optional[str] = None, channel_id: Optional[str] = None)
+             api_key: Optional[str] = None, channel_id: Optional[str] = None,
+             skip_auth_if_noninteractive: bool = True)
 ```
 
 **Description**: Initializes the YouTube client with the provided credentials, or uses the values from the environment variables.
@@ -495,6 +496,7 @@ def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str]
 - `client_secret` (Optional[str]): YouTube OAuth client secret (defaults to environment variable)
 - `api_key` (Optional[str]): YouTube API key (defaults to environment variable)
 - `channel_id` (Optional[str]): YouTube channel ID (defaults to environment variable)
+- `skip_auth_if_noninteractive` (bool): Whether to skip authentication in non-interactive environments (defaults to True)
 
 **Returns**: None
 
@@ -514,6 +516,9 @@ youtube = YouTubeClient(
     api_key="your-api-key",
     channel_id="your-channel-id"
 )
+
+# Force authentication even in non-interactive environments
+youtube = YouTubeClient(skip_auth_if_noninteractive=False)
 ```
 
 ##### Method: `authenticate`
@@ -522,7 +527,7 @@ youtube = YouTubeClient(
 def authenticate(self) -> None
 ```
 
-**Description**: Authenticates with YouTube API using OAuth 2.0.
+**Description**: Authenticates with YouTube API using OAuth 2.0. In non-interactive environments (like Docker containers), authentication will be skipped if `skip_auth_if_noninteractive` is True.
 
 **Parameters**: None
 
@@ -537,6 +542,8 @@ youtube.authenticate()
 - Refreshes the token if it's expired
 - Creates a new token if it doesn't exist or can't be refreshed
 - Saves the token for future use
+- Detects non-interactive environments using `sys.stdin.isatty()`
+- Skips OAuth authentication in non-interactive environments if configured to do so
 
 ##### Method: `upload_video`
 
@@ -548,7 +555,7 @@ def upload_video(self, video_url: str, title: str, description: str,
 **Description**: Upload a video to YouTube.
 
 **Parameters**:
-- `video_url` (str): URL of the video file to upload
+- `video_url` (str): URL of the video file to upload (can be a remote URL or a file:// URL)
 - `title` (str): Title of the video
 - `description` (str): Description of the video
 - `tags` (List[str], optional): List of tags for the video. Defaults to None.
@@ -558,12 +565,22 @@ def upload_video(self, video_url: str, title: str, description: str,
 
 **Example**:
 ```python
+# Upload from a remote URL
 youtube_id = youtube.upload_video(
     video_url="https://example.com/video.mp4",
     title="My Video",
     description="This is my video description",
     tags=["music", "original"]
 )
+
+# Upload from a local file
+youtube_id = youtube.upload_video(
+    video_url="file:///path/to/video.mp4",
+    title="My Video",
+    description="This is my video description",
+    tags=["music", "original"]
+)
+
 if youtube_id:
     print(f"Video uploaded with ID: {youtube_id}")
 else:
@@ -571,7 +588,10 @@ else:
 ```
 
 **Error Handling**:
-- Downloads the video to a temporary file
+- Handles both remote URLs and file:// URLs
+- For remote URLs, downloads the video to a temporary file
+- For file:// URLs, copies the file to a temporary location
+- For Windows file paths in Docker containers, attempts to find the file in various container locations
 - Reports upload progress
 - Cleans up the temporary file after upload
 - Re-raises upload limit exceeded errors
@@ -987,6 +1007,85 @@ comment on table influence_music is 'Stores Sonoteller analysis results for infl
 | `url`          | `text`      | URL of the analyzed music file              |
 | `analysis`     | `jsonb`     | JSON data with Sonoteller analysis results  |
 | `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
+
+## Docker Deployment Considerations
+
+When deploying Agent Angus in a Docker container, there are several important considerations:
+
+### 1. YouTube Authentication in Non-Interactive Environments
+
+Docker containers typically run in non-interactive environments, which can cause issues with YouTube authentication that requires user input. The `YouTubeClient` class has been modified to handle this:
+
+- The `skip_auth_if_noninteractive` parameter (default: True) allows the client to skip OAuth authentication in non-interactive environments
+- Non-interactive environments are detected using `sys.stdin.isatty()`
+- When authentication is skipped, YouTube functionality will be limited, but the application will continue to run
+
+To enable full YouTube functionality in Docker:
+
+1. Generate a valid token.pickle file on a local development machine using the `youtube_auth.py` script
+2. Transfer the token.pickle file to the Docker container's `/app/data` directory
+3. Restart the container
+
+```bash
+# On your local machine
+python youtube_auth.py
+
+# Transfer to server
+scp ./data/token.pickle user@your-server:/opt/angus/data/token.pickle
+
+# On the server
+docker-compose down
+docker-compose up -d
+```
+
+### 2. File Path Handling for Docker Compatibility
+
+File paths stored in the database need to be accessible from within the Docker container. Windows-style paths (e.g., `E:\path\to\file.mp4`) are not accessible from Linux-based Docker containers.
+
+The `upload_video` method in `YouTubeClient` has been enhanced to:
+
+- Handle file:// URLs properly
+- Attempt to find files in various container locations when given Windows paths
+- Provide detailed logging about file path resolution
+
+For best results, file paths in the database should use container-friendly formats:
+
+```
+file:///app/data/uploads/filename.mp4
+```
+
+### 3. Update File Paths Script (update_file_paths.py)
+
+The `update_file_paths.py` script helps update file paths in the database to be container-friendly:
+
+```python
+def update_file_paths(dry_run: bool = True) -> None
+```
+
+**Description**: Update file paths in the database to be container-friendly.
+
+**Parameters**:
+- `dry_run` (bool, optional): If True, only print the changes that would be made without actually making them. Defaults to True.
+
+**Returns**: None
+
+**Example**:
+```python
+# Run in dry-run mode to see what changes would be made
+python update_file_paths.py --dry-run
+
+# Run in execute mode to actually make the changes
+python update_file_paths.py --execute
+```
+
+**What it does**:
+1. Finds all songs with file:// URLs in the database
+2. Extracts the filename from each URL
+3. Creates a container-friendly path using the format `file:///app/data/uploads/{filename}`
+4. Updates the database records with the new paths
+5. Checks if the files exist in the container and provides guidance if they don't
+
+A shell script `update_paths.sh` is also provided to simplify the process of updating paths and restarting containers.
 
 ## Test Scripts
 
