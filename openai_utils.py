@@ -34,54 +34,73 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
         Dictionary with analysis results
     """
     try:
-        # If it's a YouTube URL, extract the audio first
+        # Prepare the prompt based on the input type
         if is_youtube_url:
-            logger.info(f"Extracting audio from YouTube URL: {input_source}")
-            extractor = YouTubeAudioExtractor()
-            mp3_path = extractor.extract_audio(input_source)
-            # Get video title for better analysis
-            from pytube import YouTube
-            yt = YouTube(input_source)
-            title = yt.title
-            description = yt.description
-        else:
-            mp3_path = input_source
-            # For uploaded files, we have limited info
-            title = os.path.basename(mp3_path)
-            description = ''
+            logger.info(f"Analyzing YouTube URL: {input_source}")
             
-        logger.info(f"Analyzing music: {title}")
+            # Create a prompt for OpenAI to analyze the YouTube video
+            prompt = f"""
+            Analyze the music in this YouTube video:
             
-        # Create a prompt for OpenAI to analyze the music based on metadata
-        prompt = f"""
-        Analyze the following music track:
-        
-        Title: {title}
-        Description: {description}
-        
-        Please provide a detailed analysis including:
-        1. Lyrics analysis (themes, moods, language, explicit content)
-        2. Music analysis (genres, subgenres, instruments, BPM, key)
-        
-        Format the response as a structured JSON object with these sections:
-        {{
-            "lyrics_analysis": {{
-                "summary": "Brief summary of the lyrics",
-                "themes": ["theme1", "theme2"],
-                "moods": ["mood1", "mood2"],
-                "language": "Language of the lyrics",
-                "explicit": "Yes/No and explanation"
-            }},
-            "music_analysis": {{
-                "genres": ["genre1", "genre2"],
-                "subgenres": ["subgenre1", "subgenre2"],
-                "instruments": ["instrument1", "instrument2"],
-                "bpm": "Estimated BPM",
-                "key": "Estimated key",
-                "vocals": "Description of vocals"
+            YouTube URL: {input_source}
+            
+            Please provide a detailed analysis of the music in this video including:
+            1. Lyrics analysis (themes, moods, language, explicit content)
+            2. Music analysis (genres, subgenres, instruments, BPM, key)
+            
+            Format the response as a structured JSON object with these sections:
+            {{
+                "lyrics_analysis": {{
+                    "summary": "Brief summary of the lyrics",
+                    "themes": ["theme1", "theme2"],
+                    "moods": ["mood1", "mood2"],
+                    "language": "Language of the lyrics",
+                    "explicit": "Yes/No and explanation"
+                }},
+                "music_analysis": {{
+                    "genres": ["genre1", "genre2"],
+                    "subgenres": ["subgenre1", "subgenre2"],
+                    "instruments": ["instrument1", "instrument2"],
+                    "bpm": "Estimated BPM",
+                    "key": "Estimated key",
+                    "vocals": "Description of vocals"
+                }}
             }}
-        }}
-        """
+            """
+        else:
+            # For MP3 files, we have limited info
+            title = os.path.basename(input_source)
+            logger.info(f"Analyzing MP3 file: {title}")
+            
+            # Create a prompt for OpenAI to analyze the MP3 file
+            prompt = f"""
+            Analyze the following music track:
+            
+            Filename: {title}
+            
+            Please provide a detailed analysis including:
+            1. Lyrics analysis (themes, moods, language, explicit content)
+            2. Music analysis (genres, subgenres, instruments, BPM, key)
+            
+            Format the response as a structured JSON object with these sections:
+            {{
+                "lyrics_analysis": {{
+                    "summary": "Brief summary of the lyrics",
+                    "themes": ["theme1", "theme2"],
+                    "moods": ["mood1", "mood2"],
+                    "language": "Language of the lyrics",
+                    "explicit": "Yes/No and explanation"
+                }},
+                "music_analysis": {{
+                    "genres": ["genre1", "genre2"],
+                    "subgenres": ["subgenre1", "subgenre2"],
+                    "instruments": ["instrument1", "instrument2"],
+                    "bpm": "Estimated BPM",
+                    "key": "Estimated key",
+                    "vocals": "Description of vocals"
+                }}
+            }}
+            """
         
         # Send to OpenAI
         response = client.chat.completions.create(
@@ -96,14 +115,6 @@ def analyze_music(input_source: str, is_youtube_url: bool = False) -> Dict[str, 
         # Parse the response
         analysis_text = response.choices[0].message.content.strip()
         analysis = json.loads(analysis_text)
-        
-        # Clean up temporary files if needed
-        if is_youtube_url and 'mp3_path' in locals():
-            try:
-                os.remove(mp3_path)
-                logger.info(f"Removed temporary file: {mp3_path}")
-            except Exception as e:
-                logger.warning(f"Failed to remove temporary file: {str(e)}")
                 
         # Format the analysis to match the expected structure
         formatted_analysis = {

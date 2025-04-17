@@ -31,6 +31,8 @@ URL_PREFIX = '/push'
 # Initialize clients
 supabase = SupabaseClient()
 
+# Remove the YouTubeAudioExtractor dependency since we're not using it anymore
+
 # Configure upload settings
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'mp3'}
