@@ -28,3 +28,19 @@ services:
       - .env
     ports:
       - "8080:5000"
+      
+  coral:
+    build: .
+    restart: always
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python angus_coral_adapter.py
+    depends_on:
+      - angus
