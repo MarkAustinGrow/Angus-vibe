@@ -1,0 +1,131 @@
+{
+  "summary": "The lyrics of the song 'Shape of You' by Ed Sheeran focus on themes of romantic attraction and infatuation. The song describes a nightlife encounter that evolves into a deeper connection, emphasizing physical attraction and chemistry.",
+  "themes": [
+    {
+      "name": "Romantic attraction",
+      "weight": 90
+    },
+    {
+      "name": "Infatuation",
+      "weight": 80
+    },
+    {
+      "name": "Nightlife",
+      "weight": 70
+    }
+  ],
+  "moods": [
+    {
+      "name": "Romantic",
+      "weight": 80
+    },
+    {
+      "name": "Dynamic/Energetic",
+      "weight": 70
+    },
+    {
+      "name": "Excited",
+      "weight": 60
+    }
+  ],
+  "language": "English",
+  "explicit": "No explicit content",
+  "genres": [
+    {
+      "name": "Pop",
+      "weight": 80
+    },
+    {
+      "name": "Dancehall",
+      "weight": 60
+    },
+    {
+      "name": "Tropical House",
+      "weight": 50
+    }
+  ],
+  "subgenres": [
+    {
+      "name": "Tropical Pop",
+      "weight": 70
+    },
+    {
+      "name": "Acoustic Pop",
+      "weight": 50
+    },
+    {
+      "name": "Dance Pop",
+      "weight": 40
+    }
+  ],
+  "instruments": [
+    "guitar",
+    "percussion",
+    "synthesizer"
+  ],
+  "bpm": "96",
+  "key": "C# minor",
+  "vocals": "The vocals are smooth and playful, with a rhythmic delivery that complements the danceable beat of the music.",
+  "music_moods": [
+    {
+      "name": "Energetic",
+      "weight": 80
+    },
+    {
+      "name": "Romantic",
+      "weight": 60
+    },
+    {
+      "name": "Fun",
+      "weight": 50
+    }
+  ],
+  "ddex moods": [
+    "Romantic",
+    "Dynamic/Energetic",
+    "Excited"
+  ],
+  "ddex themes": [
+    "Romantic attraction",
+    "Infatuation",
+    "Nightlife"
+  ],
+  "music_creation_params": {
+    "type": "vocal",
+    "lyrics": "Under the neon lights, we found our way, Dancing through the night, like we owned the day. Your smile's a melody, in this crowded room, Lost in your rhythm, two hearts in bloom.",
+    "gender": "Female",
+    "genres": [
+      {
+        "name": "Pop",
+        "weight": 80
+      },
+      {
+        "name": "Tropical House",
+        "weight": 60
+      }
+    ],
+    "moods": [
+      {
+        "name": "Romantic",
+        "weight": 80
+      },
+      {
+        "name": "Energetic",
+        "weight": 70
+      }
+    ],
+    "timbres": [
+      {
+        "name": "Bright",
+        "weight": 70
+      },
+      {
+        "name": "Sweet",
+        "weight": 60
+      }
+    ],
+    "duration": 120
+  },
+  "title": "Shape of Attraction",
+  "original_url": "https://www.youtube.com/watch?v=JGwWNGJdvx8"
+}

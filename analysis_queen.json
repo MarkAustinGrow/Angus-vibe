@@ -1,0 +1,133 @@
+{
+  "summary": "The lyrics of this iconic Queen song explore themes of existentialism, remorse, and acceptance. The protagonist grapples with the consequences of his actions, reflecting on the decisions that have led him to a point of no return. The intense emotional expression captures a sense of regret and sorrow, while also pondering life and the inevitability of fate.",
+  "themes": [
+    {
+      "name": "Existentialism",
+      "weight": 90
+    },
+    {
+      "name": "Remorse",
+      "weight": 85
+    },
+    {
+      "name": "Acceptance",
+      "weight": 75
+    }
+  ],
+  "moods": [
+    {
+      "name": "Sorrow/Sad",
+      "weight": 80
+    },
+    {
+      "name": "Sentimental/Melancholic/Lonely",
+      "weight": 75
+    },
+    {
+      "name": "Inspirational/Hopeful",
+      "weight": 50
+    }
+  ],
+  "language": "English",
+  "explicit": "No explicit content",
+  "genres": [
+    {
+      "name": "Rock",
+      "weight": 80
+    },
+    {
+      "name": "Pop Rock",
+      "weight": 70
+    },
+    {
+      "name": "Classical",
+      "weight": 50
+    }
+  ],
+  "subgenres": [
+    {
+      "name": "Progressive Rock",
+      "weight": 80
+    },
+    {
+      "name": "Opera Rock",
+      "weight": 70
+    },
+    {
+      "name": "Symphonic Rock",
+      "weight": 60
+    }
+  ],
+  "instruments": [
+    "piano",
+    "electric guitar",
+    "drums",
+    "bass guitar",
+    "vocals"
+  ],
+  "bpm": "72",
+  "key": "Bb Major",
+  "vocals": "Freddie Mercury's powerful and dynamic vocal delivery ranges from intense operatic passages to soft, introspective moments.",
+  "music_moods": [
+    {
+      "name": "Dramatic",
+      "weight": 85
+    },
+    {
+      "name": "Epic",
+      "weight": 80
+    },
+    {
+      "name": "Dynamic/Energetic",
+      "weight": 60
+    }
+  ],
+  "ddex moods": [
+    "Sorrow/Sad",
+    "Sentimental/Melancholic/Lonely",
+    "Inspirational/Hopeful"
+  ],
+  "ddex themes": [
+    "Existentialism",
+    "Remorse",
+    "Acceptance"
+  ],
+  "music_creation_params": {
+    "type": "vocal",
+    "lyrics": "In a world where shadows play, beneath the fading light, I hear whispers of the past, in echoes of the night. Choices made in moments few, the paths once walked, I now review. Embracing winds of change, as stars align anew. A heartbeat's distant cry, in dreams adrift, I sail the sky. If only time could bend, to hear the silent sigh.",
+    "gender": "Female",
+    "genres": [
+      {
+        "name": "Rock",
+        "weight": 80
+      },
+      {
+        "name": "Pop Rock",
+        "weight": 60
+      }
+    ],
+    "moods": [
+      {
+        "name": "Dramatic",
+        "weight": 80
+      },
+      {
+        "name": "Epic",
+        "weight": 60
+      }
+    ],
+    "timbres": [
+      {
+        "name": "Powerful",
+        "weight": 80
+      },
+      {
+        "name": "Warm",
+        "weight": 60
+      }
+    ],
+    "duration": 354
+  },
+  "title": "Ephemeral Reflections",
+  "original_url": "https://www.youtube.com/watch?v=fJ9rUzIMcZQ"
+}
