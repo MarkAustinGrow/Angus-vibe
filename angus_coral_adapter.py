@@ -39,19 +39,19 @@ class AngusCoralAdapter:
     Adapter to integrate Agent Angus with the Coral Protocol server.
     """
     
-    def __init__(self, session_id=None, server_url="https://coral.pushcollective.club", use_devmode=True):
+    def __init__(self, session_id="angus-agent", server_url="https://coral.pushcollective.club", use_devmode=True):
         """
         Initialize the Angus Coral Adapter.
         
         Args:
-            session_id (str, optional): Unique session identifier. Defaults to a generated ID.
+            session_id (str, optional): Unique session identifier. Defaults to "angus-agent".
             server_url (str, optional): Base URL of the Coral server. Defaults to "https://coral.pushcollective.club".
             use_devmode (bool, optional): Whether to use DevMode endpoints. Defaults to True.
         """
         # Initialize Agent Angus
         self.angus = AgentAngus()
         
-        # Initialize Coral client
+        # Initialize Coral client with a consistent session ID
         self.coral_client = CoralClient(
             session_id=session_id,
             server_url=server_url,
@@ -60,8 +60,10 @@ class AngusCoralAdapter:
         
         self.agent_id = None
         self.logger = logging.getLogger("angus_coral_adapter")
+        self.threads = {}  # Store thread information
+        self.yona_agent_id = "yona-agent"  # Yona's fixed agent ID
         
-        self.logger.info("Angus Coral Adapter initialized")
+        self.logger.info(f"Angus Coral Adapter initialized with session ID: {session_id}")
     
     def register_agent(self):
         """
@@ -83,6 +85,70 @@ class AngusCoralAdapter:
             self.logger.error("Failed to register Agent Angus with Coral server")
             
         return self.agent_id
+    
+    def create_thread_with_yona(self, metadata=None):
+        """
+        Create a thread with Yona.
+        
+        Args:
+            metadata (dict, optional): Additional metadata for the thread. Defaults to None.
+            
+        Returns:
+            str: The thread ID assigned by the server, or None if thread creation failed.
+        """
+        self.logger.info("Creating thread with Yona")
+        
+        if not self.agent_id:
+            self.logger.error("Cannot create thread: Agent not registered")
+            return None
+        
+        # Create a thread with both Angus and Yona
+        thread_id = self.coral_client.create_thread(
+            participants=[self.agent_id, self.yona_agent_id],
+            metadata=metadata or {"topic": "Music Creation"}
+        )
+        
+        if thread_id:
+            self.logger.info(f"Thread created with ID: {thread_id}")
+            self.threads[thread_id] = {
+                "created_at": time.time(),
+                "participants": [self.agent_id, self.yona_agent_id]
+            }
+        else:
+            self.logger.error("Failed to create thread with Yona")
+            
+        return thread_id
+    
+    def send_message_to_yona(self, thread_id, content):
+        """
+        Send a message to Yona using multiple mention formats for maximum reliability.
+        
+        Args:
+            thread_id (str): The ID of the thread to send the message to
+            content (str): The content of the message
+            
+        Returns:
+            str: The message ID assigned by the server, or None if sending failed
+        """
+        self.logger.info(f"Sending message to Yona in thread {thread_id}")
+        
+        # Ensure the content includes @mention format if not already present
+        if not f"@{self.yona_agent_id}" in content:
+            content = f"@{self.yona_agent_id} {content}"
+        
+        # Send the message with explicit mention in the API call
+        message_id = self.coral_client.send_message(
+            thread_id=thread_id,
+            content=content,
+            mentions=[self.yona_agent_id]  # Explicit mention in the API call
+        )
+        
+        if message_id:
+            self.logger.info(f"Message sent to Yona with ID: {message_id}")
+        else:
+            self.logger.error("Failed to send message to Yona")
+            
+        return message_id
     
     def upload_song_to_youtube(self, video_url, title, description, tags=None):
         """
@@ -476,6 +542,48 @@ class AngusCoralAdapter:
         self.coral_client.send_message(thread_id, help_message, [sender_id])
         return {"success": True, "action": "help", "thread_id": thread_id}
 
+    def handle_yona_response(self, data):
+        """
+        Handle responses from Yona.
+        
+        Args:
+            data (dict): The message data
+            
+        Returns:
+            bool: True if the message was handled, False otherwise
+        """
+        sender_id = data.get('sender_id')
+        content = data.get('content', '')
+        thread_id = data.get('thread_id')
+        
+        # Check if the message is from Yona
+        if sender_id != self.yona_agent_id:
+            return False
+        
+        self.logger.info(f"Received message from Yona in thread {thread_id}")
+        
+        # Check if Yona created a song
+        if "Created song" in content:
+            self.logger.info("Yona created a song!")
+            
+            # Extract song information
+            lines = content.split('\n')
+            song_info = {
+                "title": lines[0].replace("Created song '", "").replace("'", ""),
+                "audio_url": next((line.replace("Audio: ", "") for line in lines if line.startswith("Audio: ")), None),
+                "lyrics": '\n'.join(lines[3:]) if len(lines) > 3 else ""
+            }
+            
+            self.logger.info(f"Song information: {json.dumps(song_info, indent=2)}")
+            
+            # Send a thank you message
+            thank_you = f"Thanks for creating '{song_info['title']}'! It sounds great!"
+            self.send_message_to_yona(thread_id, thank_you)
+            
+            return True
+        
+        return False
+
 def main():
     """
     Main entry point for the Angus Coral Adapter.
@@ -488,8 +596,8 @@ def main():
     
     logger.info("Starting Angus Coral Adapter")
     
-    # Create the adapter
-    adapter = AngusCoralAdapter(use_devmode=True)
+    # Create the adapter with a consistent session ID
+    adapter = AngusCoralAdapter(session_id="angus-agent", use_devmode=True)
     
     # Register the agent
     agent_id = adapter.register_agent()
@@ -503,8 +611,13 @@ def main():
     
     def handle_message(data):
         logger.info(f"Received message: {json.dumps(data, indent=2)}")
-        # Process messages here
-        # This would be expanded to handle specific message types
+        
+        # Check if the message is from Yona and handle it
+        if adapter.handle_yona_response(data):
+            logger.info("Message from Yona was handled")
+        else:
+            # Process other messages here
+            pass
     
     # Start listening for events
     adapter.coral_client.start_listening({
@@ -514,16 +627,33 @@ def main():
     
     logger.info("Listening for events")
     
-    # Run in continuous mode
+    # Run in continuous mode with improved reconnection logic
     try:
+        retries = 0
+        max_retries = 5
         while True:
             try:
                 # Process mentions
                 adapter.process_mentions(timeout_seconds=30)
+                retries = 0  # Reset retries on success
                 time.sleep(1)
             except Exception as e:
-                logger.error(f"Error processing mentions: {str(e)}")
-                time.sleep(5)
+                retries += 1
+                logger.error(f"Error processing mentions: {str(e)}, retry {retries}/{max_retries}")
+                # Exponential backoff
+                sleep_time = min(30, 5 * retries)
+                logger.info(f"Waiting {sleep_time} seconds before retrying...")
+                time.sleep(sleep_time)
+                
+                # If we've reached max retries, try to reconnect
+                if retries >= max_retries:
+                    logger.info("Max retries reached, attempting to reconnect...")
+                    try:
+                        # Re-register the agent
+                        adapter.register_agent()
+                        retries = 0
+                    except Exception as reconnect_error:
+                        logger.error(f"Error reconnecting: {str(reconnect_error)}")
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received, shutting down")
 
