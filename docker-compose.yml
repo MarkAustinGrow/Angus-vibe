@@ -28,3 +28,20 @@ services:
       - .env
     ports:
       - "8080:5000"
+
+  angus-coral:
+    build: .
+    restart: always
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - CORAL_SERVER_URL=http://coral.pushcollective.club:3001
+      - AGENT_ID=did:web:angus.ai
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python run_angus_coral.py --daemon
