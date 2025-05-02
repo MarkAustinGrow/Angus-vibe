@@ -184,7 +184,14 @@ class SimpleCoralAgent:
             logger.info(f"Response headers: {dict(response.headers)}")
             logger.info(f"Response content: {response.text}")
             
-            # Try to parse the response as JSON
+            # If the server accepted the request, consider it successful
+            if response.status_code == 202:
+                # Generate a thread ID based on participants
+                thread_id = f"thread-{'-'.join(participants)}-{str(uuid.uuid4())[:8]}"
+                logger.info(f"Request accepted, generated thread ID: {thread_id}")
+                return thread_id
+                
+            # Try to parse the response as JSON if not 202
             try:
                 response_data = response.json()
                 logger.info(f"Create thread response (parsed): {response_data}")
@@ -238,7 +245,12 @@ class SimpleCoralAgent:
             logger.info(f"Response headers: {dict(response.headers)}")
             logger.info(f"Response content: {response.text}")
             
-            # Try to parse the response as JSON
+            # If the server accepted the request, consider it successful
+            if response.status_code == 202:
+                logger.info(f"Message to thread {thread_id} accepted")
+                return True
+                
+            # Try to parse the response as JSON if not 202
             try:
                 response_data = response.json()
                 logger.info(f"Send message response (parsed): {response_data}")
@@ -293,7 +305,12 @@ class SimpleCoralAgent:
             logger.info(f"Response headers: {dict(response.headers)}")
             logger.info(f"Response content: {response.text}")
             
-            # Try to parse the response as JSON
+            # If the server accepted the request, consider it successful
+            if response.status_code == 202:
+                logger.info(f"List agents request accepted")
+                return []  # Return empty list for now, actual agents will come via events
+                
+            # Try to parse the response as JSON if not 202
             try:
                 response_data = response.json()
                 logger.info(f"List agents response (parsed): {response_data}")
