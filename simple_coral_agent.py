@@ -6,11 +6,20 @@ import threading
 import queue
 import re
 import time
+import http.client as http_client
 
-# Configure basic logging
+# Configure enhanced logging for HTTP debugging
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Enable HTTP connection debugging
+http_client.HTTPConnection.debuglevel = 1
+
+# Configure detailed logging for requests
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
 
 class SimpleCoralAgent:
     def __init__(self, server_url, agent_id):
@@ -85,19 +94,22 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Simplified payload with minimal fields
+        # Try different message formats
+        # Format 1: With ID and simplified agent_id
+        simplified_agent_id = self.agent_id.replace("did:web:", "")
+        
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "type": "tool_call",
             "tool": "register_agent",
             "arguments": {
-                "agent_id": self.agent_id,
+                "agent_id": simplified_agent_id,  # Simplified agent ID
                 "name": name,
                 "description": description
-                # Removed capabilities array to simplify
             }
         }
         
-        logger.info(f"Registering agent {self.agent_id} with Coral server")
+        logger.info(f"Registering agent {simplified_agent_id} with Coral server")
         logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")
         
         # Add headers for the request
@@ -131,6 +143,37 @@ class SimpleCoralAgent:
             # Check if the response was successful
             if response.status_code >= 400:
                 logger.error(f"Registration failed with status code: {response.status_code}")
+                
+                # If first format fails, try a second format
+                logger.info("First format failed, trying alternative format...")
+                
+                alt_payload = {
+                    "action": "register_agent",  # Try the old format
+                    "payload": {
+                        "agent_id": simplified_agent_id,
+                        "name": name,
+                        "description": description
+                    }
+                }
+                
+                logger.info(f"Sending alternative registration message: {json.dumps(alt_payload, indent=2)}")
+                
+                try:
+                    alt_response = requests.post(message_url, json=alt_payload, headers=headers)
+                    logger.info(f"Alternative response status code: {alt_response.status_code}")
+                    logger.info(f"Alternative response content: {alt_response.text}")
+                    
+                    if alt_response.status_code < 400:
+                        logger.info("Alternative format succeeded!")
+                        return True
+                    else:
+                        logger.error("Alternative format also failed")
+                        return False
+                        
+                except Exception as alt_e:
+                    logger.error(f"Error with alternative format: {str(alt_e)}")
+                    return False
+                    
                 return False
                 
             return True
@@ -253,6 +296,58 @@ class SimpleCoralAgent:
             logger.error(f"Error sending message: {str(e)}")
             return False
             
+    def list_agents(self):
+        """List all agents registered with the Coral server."""
+        if not self.transport_session_id:
+            logger.error("Not connected to server, cannot list agents")
+            return False
+            
+        message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
+        
+        # Simple payload for list_agents
+        payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
+            "type": "tool_call",
+            "tool": "list_agents",
+            "arguments": {}
+        }
+        
+        logger.info(f"Listing agents from Coral server")
+        logger.info(f"Sending list_agents message: {json.dumps(payload, indent=2)}")
+        
+        # Add headers for the request
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        try:
+            # Log the complete request details
+            logger.info(f"Request URL: {message_url}")
+            logger.info(f"Request headers: {headers}")
+            logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            # Send the request with headers
+            response = requests.post(message_url, json=payload, headers=headers)
+            
+            # Log the complete response details
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content: {response.text}")
+            
+            # Try to parse the response as JSON
+            try:
+                response_data = response.json()
+                logger.info(f"List agents response (parsed): {response_data}")
+                return response_data.get("agents", [])
+            except Exception as json_error:
+                logger.error(f"Error parsing response as JSON: {str(json_error)}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error listing agents: {str(e)}")
+            return []
+    
     def process_messages(self, timeout=5):
         """Process any received messages for a specified time."""
         end_time = time.time() + timeout
