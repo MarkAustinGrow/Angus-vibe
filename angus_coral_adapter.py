@@ -62,23 +62,18 @@ class AngusCoralAdapter(SimpleCoralAgent):
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Simplified agent ID
-        simplified_agent_id = self.agent_id.replace("did:web:", "")
-        
-        # Updated payload format with required ID field
+        # Use the format that Yona uses successfully
         payload = {
-            "id": str(uuid.uuid4()),  # Add a unique message ID
-            "type": "tool_call",
-            "tool": "register_agent",
-            "arguments": {
-                "agent_id": simplified_agent_id,  # Use simplified agent ID
+            "action": "register_agent",
+            "payload": {
+                "agent_id": self.agent_id,  # Use full DID format
                 "name": name,
                 "description": description,
                 "capabilities": capabilities
             }
         }
         
-        logger.info(f"Registering agent {simplified_agent_id} with capabilities: {capabilities}")
+        logger.info(f"Registering agent {self.agent_id} with capabilities: {capabilities}")
         logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")
         try:
             response = self.send_message_to_server(message_url, payload)
@@ -104,10 +99,9 @@ class AngusCoralAdapter(SimpleCoralAgent):
         """
         import requests
         
-        # Add headers for the request
+        # Add headers for the request - use the same headers as Yona
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Content-Type": "application/json"
         }
         
         try:

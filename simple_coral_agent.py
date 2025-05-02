@@ -94,28 +94,22 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Try different message formats
-        # Format 1: With ID and simplified agent_id
-        simplified_agent_id = self.agent_id.replace("did:web:", "")
-        
+        # Use the format that Yona uses successfully
         payload = {
-            "id": str(uuid.uuid4()),  # Add a unique message ID
-            "type": "tool_call",
-            "tool": "register_agent",
-            "arguments": {
-                "agent_id": simplified_agent_id,  # Simplified agent ID
+            "action": "register_agent",
+            "payload": {
+                "agent_id": self.agent_id,  # Use full DID format
                 "name": name,
                 "description": description
             }
         }
         
-        logger.info(f"Registering agent {simplified_agent_id} with Coral server")
+        logger.info(f"Registering agent {self.agent_id} with Coral server")
         logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")
         
         # Add headers for the request
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Content-Type": "application/json"
         }
         
         try:
@@ -143,37 +137,6 @@ class SimpleCoralAgent:
             # Check if the response was successful
             if response.status_code >= 400:
                 logger.error(f"Registration failed with status code: {response.status_code}")
-                
-                # If first format fails, try a second format
-                logger.info("First format failed, trying alternative format...")
-                
-                alt_payload = {
-                    "action": "register_agent",  # Try the old format
-                    "payload": {
-                        "agent_id": simplified_agent_id,
-                        "name": name,
-                        "description": description
-                    }
-                }
-                
-                logger.info(f"Sending alternative registration message: {json.dumps(alt_payload, indent=2)}")
-                
-                try:
-                    alt_response = requests.post(message_url, json=alt_payload, headers=headers)
-                    logger.info(f"Alternative response status code: {alt_response.status_code}")
-                    logger.info(f"Alternative response content: {alt_response.text}")
-                    
-                    if alt_response.status_code < 400:
-                        logger.info("Alternative format succeeded!")
-                        return True
-                    else:
-                        logger.error("Alternative format also failed")
-                        return False
-                        
-                except Exception as alt_e:
-                    logger.error(f"Error with alternative format: {str(alt_e)}")
-                    return False
-                    
                 return False
                 
             return True
@@ -189,14 +152,11 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Updated payload with required ID field
+        # Use the format that Yona uses successfully
         payload = {
-            "id": str(uuid.uuid4()),  # Add a unique message ID
-            "type": "tool_call",
-            "tool": "create_thread",
-            "arguments": {
+            "action": "create_thread",
+            "payload": {
                 "participants": participants
-                # Removed metadata to simplify
             }
         }
         
@@ -205,8 +165,7 @@ class SimpleCoralAgent:
         
         # Add headers for the request
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Content-Type": "application/json"
         }
         
         try:
@@ -244,19 +203,13 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Simplified agent ID
-        simplified_agent_id = self.agent_id.replace("did:web:", "")
-        
-        # Updated payload with required ID field
+        # Use the format that Yona uses successfully
         payload = {
-            "id": str(uuid.uuid4()),  # Add a unique message ID
-            "type": "tool_call",
-            "tool": "send_message",
-            "arguments": {
+            "action": "send_message",
+            "payload": {
                 "thread_id": thread_id,
-                "sender_id": simplified_agent_id,  # Use simplified agent ID
+                "sender_id": self.agent_id,  # Use full DID format
                 "content": content
-                # Removed mentions to simplify
             }
         }
         
@@ -265,8 +218,7 @@ class SimpleCoralAgent:
         
         # Add headers for the request
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Content-Type": "application/json"
         }
         
         try:
@@ -309,12 +261,10 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Simple payload for list_agents
+        # Use the format that Yona uses successfully
         payload = {
-            "id": str(uuid.uuid4()),  # Add a unique message ID
-            "type": "tool_call",
-            "tool": "list_agents",
-            "arguments": {}
+            "action": "list_agents",
+            "payload": {}
         }
         
         logger.info(f"Listing agents from Coral server")
@@ -322,8 +272,7 @@ class SimpleCoralAgent:
         
         # Add headers for the request
         headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Content-Type": "application/json"
         }
         
         try:
