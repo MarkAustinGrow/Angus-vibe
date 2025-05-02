@@ -94,8 +94,9 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Use the format that Yona uses successfully
+        # Use the JSON-RPC format with required id field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "action": "register_agent",
             "payload": {
                 "agent_id": self.agent_id,  # Use full DID format
@@ -152,8 +153,9 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Use the format that Yona uses successfully
+        # Use the JSON-RPC format with required id field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "action": "create_thread",
             "payload": {
                 "participants": participants
@@ -203,8 +205,9 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Use the format that Yona uses successfully
+        # Use the JSON-RPC format with required id field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "action": "send_message",
             "payload": {
                 "thread_id": thread_id,
@@ -261,8 +264,9 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Use the format that Yona uses successfully
+        # Use the JSON-RPC format with required id field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "action": "list_agents",
             "payload": {}
         }
