@@ -85,24 +85,54 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Updated payload format to match what the Coral server expects
+        # Simplified payload with minimal fields
         payload = {
             "type": "tool_call",
             "tool": "register_agent",
             "arguments": {
                 "agent_id": self.agent_id,
                 "name": name,
-                "description": description,
-                "capabilities": []
+                "description": description
+                # Removed capabilities array to simplify
             }
         }
         
         logger.info(f"Registering agent {self.agent_id} with Coral server")
-        logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")  # Added for debugging
+        logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")
+        
+        # Add headers for the request
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
         try:
-            response = requests.post(message_url, json=payload)
-            response_data = response.json()
-            logger.info(f"Registration response: {response_data}")
+            # Log the complete request details
+            logger.info(f"Request URL: {message_url}")
+            logger.info(f"Request headers: {headers}")
+            logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            # Send the request with headers
+            response = requests.post(message_url, json=payload, headers=headers)
+            
+            # Log the complete response details
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content: {response.text}")
+            
+            # Try to parse the response as JSON
+            try:
+                response_data = response.json()
+                logger.info(f"Registration response (parsed): {response_data}")
+            except Exception as json_error:
+                logger.error(f"Error parsing response as JSON: {str(json_error)}")
+                response_data = {}
+            
+            # Check if the response was successful
+            if response.status_code >= 400:
+                logger.error(f"Registration failed with status code: {response.status_code}")
+                return False
+                
             return True
         except Exception as e:
             logger.error(f"Error registering agent: {str(e)}")
@@ -116,23 +146,48 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Updated payload format to match what the Coral server expects
+        # Simplified payload with minimal fields
         payload = {
             "type": "tool_call",
             "tool": "create_thread",
             "arguments": {
-                "participants": participants,
-                "metadata": {}
+                "participants": participants
+                # Removed metadata to simplify
             }
         }
         
         logger.info(f"Creating thread with participants: {participants}")
-        logger.info(f"Sending create thread message: {json.dumps(payload, indent=2)}")  # Added for debugging
+        logger.info(f"Sending create thread message: {json.dumps(payload, indent=2)}")
+        
+        # Add headers for the request
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
         try:
-            response = requests.post(message_url, json=payload)
-            response_data = response.json()
-            logger.info(f"Create thread response: {response_data}")
-            return response_data.get("thread_id")
+            # Log the complete request details
+            logger.info(f"Request URL: {message_url}")
+            logger.info(f"Request headers: {headers}")
+            logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            # Send the request with headers
+            response = requests.post(message_url, json=payload, headers=headers)
+            
+            # Log the complete response details
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content: {response.text}")
+            
+            # Try to parse the response as JSON
+            try:
+                response_data = response.json()
+                logger.info(f"Create thread response (parsed): {response_data}")
+                return response_data.get("thread_id")
+            except Exception as json_error:
+                logger.error(f"Error parsing response as JSON: {str(json_error)}")
+                return None
+            
         except Exception as e:
             logger.error(f"Error creating thread: {str(e)}")
             return None
@@ -145,24 +200,54 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Updated payload format to match what the Coral server expects
+        # Simplified payload with minimal fields
         payload = {
             "type": "tool_call",
             "tool": "send_message",
             "arguments": {
                 "thread_id": thread_id,
                 "sender_id": self.agent_id,
-                "content": content,
-                "mentions": mentions
+                "content": content
+                # Removed mentions to simplify
             }
         }
         
         logger.info(f"Sending message to thread {thread_id}")
-        logger.info(f"Sending message payload: {json.dumps(payload, indent=2)}")  # Added for debugging
+        logger.info(f"Sending message payload: {json.dumps(payload, indent=2)}")
+        
+        # Add headers for the request
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
         try:
-            response = requests.post(message_url, json=payload)
-            response_data = response.json()
-            logger.info(f"Send message response: {response_data}")
+            # Log the complete request details
+            logger.info(f"Request URL: {message_url}")
+            logger.info(f"Request headers: {headers}")
+            logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            # Send the request with headers
+            response = requests.post(message_url, json=payload, headers=headers)
+            
+            # Log the complete response details
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content: {response.text}")
+            
+            # Try to parse the response as JSON
+            try:
+                response_data = response.json()
+                logger.info(f"Send message response (parsed): {response_data}")
+            except Exception as json_error:
+                logger.error(f"Error parsing response as JSON: {str(json_error)}")
+                response_data = {}
+            
+            # Check if the response was successful
+            if response.status_code >= 400:
+                logger.error(f"Send message failed with status code: {response.status_code}")
+                return False
+                
             return True
         except Exception as e:
             logger.error(f"Error sending message: {str(e)}")
