@@ -189,8 +189,9 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Simplified payload with minimal fields
+        # Updated payload with required ID field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "type": "tool_call",
             "tool": "create_thread",
             "arguments": {
@@ -243,13 +244,17 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Simplified payload with minimal fields
+        # Simplified agent ID
+        simplified_agent_id = self.agent_id.replace("did:web:", "")
+        
+        # Updated payload with required ID field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "type": "tool_call",
             "tool": "send_message",
             "arguments": {
                 "thread_id": thread_id,
-                "sender_id": self.agent_id,
+                "sender_id": simplified_agent_id,  # Use simplified agent ID
                 "content": content
                 # Removed mentions to simplify
             }

@@ -62,20 +62,24 @@ class AngusCoralAdapter(SimpleCoralAgent):
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
-        # Updated payload format to match what the Coral server expects
+        # Simplified agent ID
+        simplified_agent_id = self.agent_id.replace("did:web:", "")
+        
+        # Updated payload format with required ID field
         payload = {
+            "id": str(uuid.uuid4()),  # Add a unique message ID
             "type": "tool_call",
             "tool": "register_agent",
             "arguments": {
-                "agent_id": self.agent_id,
+                "agent_id": simplified_agent_id,  # Use simplified agent ID
                 "name": name,
                 "description": description,
                 "capabilities": capabilities
             }
         }
         
-        logger.info(f"Registering agent {self.agent_id} with capabilities: {capabilities}")
-        logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")  # Added for debugging
+        logger.info(f"Registering agent {simplified_agent_id} with capabilities: {capabilities}")
+        logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")
         try:
             response = self.send_message_to_server(message_url, payload)
             logger.info(f"Registration response: {response}")
@@ -100,10 +104,37 @@ class AngusCoralAdapter(SimpleCoralAgent):
         """
         import requests
         
+        # Add headers for the request
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
         try:
-            response = requests.post(url, json=payload)
+            # Log the complete request details
+            logger.info(f"Request URL: {url}")
+            logger.info(f"Request headers: {headers}")
+            logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
+            
+            # Send the request with headers
+            response = requests.post(url, json=payload, headers=headers)
+            
+            # Log the complete response details
+            logger.info(f"Response status code: {response.status_code}")
+            logger.info(f"Response headers: {dict(response.headers)}")
+            logger.info(f"Response content: {response.text}")
+            
             response.raise_for_status()  # Raise an exception for 4XX/5XX responses
-            return response.json()
+            
+            # Try to parse the response as JSON
+            try:
+                response_data = response.json()
+                logger.info(f"Response data (parsed): {response_data}")
+                return response_data
+            except Exception as json_error:
+                logger.error(f"Error parsing response as JSON: {str(json_error)}")
+                return {}
+                
         except Exception as e:
             logger.error(f"Error sending message to server: {str(e)}")
             raise
@@ -200,7 +231,11 @@ class AngusCoralAdapter(SimpleCoralAgent):
         Returns:
             Thread ID if successful, None otherwise
         """
-        return self.create_thread(["did:web:yona.ai", self.agent_id])
+        # Simplified agent IDs
+        simplified_agent_id = self.agent_id.replace("did:web:", "")
+        simplified_yona_id = "yona.ai"  # Simplified from did:web:yona.ai
+        
+        return self.create_thread([simplified_yona_id, simplified_agent_id])
     
     def send_message_to_yona(self, thread_id: str, content: str) -> bool:
         """
@@ -213,7 +248,10 @@ class AngusCoralAdapter(SimpleCoralAgent):
         Returns:
             True if the message was sent successfully, False otherwise
         """
-        return self.send_message(thread_id, content, mentions=["did:web:yona.ai"])
+        # Simplified Yona agent ID
+        simplified_yona_id = "yona.ai"  # Simplified from did:web:yona.ai
+        
+        return self.send_message(thread_id, content, mentions=[simplified_yona_id])
     
     def run_message_loop(self, check_interval=1):
         """
