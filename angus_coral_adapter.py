@@ -62,9 +62,11 @@ class AngusCoralAdapter(SimpleCoralAgent):
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
+        # Updated payload format to match what the Coral server expects
         payload = {
-            "action": "register_agent",
-            "payload": {
+            "type": "tool_call",
+            "tool": "register_agent",
+            "arguments": {
                 "agent_id": self.agent_id,
                 "name": name,
                 "description": description,
@@ -73,6 +75,7 @@ class AngusCoralAdapter(SimpleCoralAgent):
         }
         
         logger.info(f"Registering agent {self.agent_id} with capabilities: {capabilities}")
+        logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")  # Added for debugging
         try:
             response = self.send_message_to_server(message_url, payload)
             logger.info(f"Registration response: {response}")

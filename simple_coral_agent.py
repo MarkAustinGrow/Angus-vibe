@@ -85,9 +85,11 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
+        # Updated payload format to match what the Coral server expects
         payload = {
-            "action": "register_agent",
-            "payload": {
+            "type": "tool_call",
+            "tool": "register_agent",
+            "arguments": {
                 "agent_id": self.agent_id,
                 "name": name,
                 "description": description,
@@ -96,6 +98,7 @@ class SimpleCoralAgent:
         }
         
         logger.info(f"Registering agent {self.agent_id} with Coral server")
+        logger.info(f"Sending registration message: {json.dumps(payload, indent=2)}")  # Added for debugging
         try:
             response = requests.post(message_url, json=payload)
             response_data = response.json()
@@ -113,15 +116,18 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
+        # Updated payload format to match what the Coral server expects
         payload = {
-            "action": "create_thread",
-            "payload": {
+            "type": "tool_call",
+            "tool": "create_thread",
+            "arguments": {
                 "participants": participants,
                 "metadata": {}
             }
         }
         
         logger.info(f"Creating thread with participants: {participants}")
+        logger.info(f"Sending create thread message: {json.dumps(payload, indent=2)}")  # Added for debugging
         try:
             response = requests.post(message_url, json=payload)
             response_data = response.json()
@@ -139,9 +145,11 @@ class SimpleCoralAgent:
             
         message_url = f"{self.server_url}/devmode/exampleApplication/privkey/{self.session_id}/message?sessionId={self.transport_session_id}"
         
+        # Updated payload format to match what the Coral server expects
         payload = {
-            "action": "send_message",
-            "payload": {
+            "type": "tool_call",
+            "tool": "send_message",
+            "arguments": {
                 "thread_id": thread_id,
                 "sender_id": self.agent_id,
                 "content": content,
@@ -150,6 +158,7 @@ class SimpleCoralAgent:
         }
         
         logger.info(f"Sending message to thread {thread_id}")
+        logger.info(f"Sending message payload: {json.dumps(payload, indent=2)}")  # Added for debugging
         try:
             response = requests.post(message_url, json=payload)
             response_data = response.json()
