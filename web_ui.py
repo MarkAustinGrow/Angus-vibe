@@ -2,7 +2,8 @@
 Web UI module for Agent Angus.
 
 This module provides a web interface for interacting with Agent Angus,
-including a UI for analyzing music using the OpenAI API.
+including a UI for analyzing music using the OpenAI API and a control panel
+for the CrewAI integration.
 """
 import os
 import logging
@@ -13,6 +14,23 @@ import threading
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from typing import Dict, Any
+
+# Import CrewAI integration
+try:
+    from angus_crew import AngusCrew
+except ImportError:
+    # If the CrewAI integration is not available, create a dummy class
+    class AngusCrew:
+        def __init__(self):
+            pass
+        def run_analysis_only(self):
+            return {"error": "CrewAI integration not available"}
+        def run_upload_only(self):
+            return {"error": "CrewAI integration not available"}
+        def run_engagement_only(self):
+            return {"error": "CrewAI integration not available"}
+        def run_full_workflow(self):
+            return {"error": "CrewAI integration not available"}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -399,6 +417,58 @@ def push_analyze():
 def push_analyze_youtube():
     """Analyze a YouTube video using OpenAI for the push endpoint."""
     return analyze_youtube()
+
+@app.route('/crew')
+def crew_page():
+    """Render the CrewAI control panel."""
+    return render_template('crew.html')
+
+@app.route(f'{URL_PREFIX}/crew')
+def push_crew_page():
+    """Render the CrewAI control panel for the push endpoint."""
+    return render_template('crew.html')
+
+@app.route('/api/crew/run', methods=['POST'])
+def run_crew_task():
+    """Run a CrewAI task."""
+    try:
+        data = request.json
+        task_type = data.get('task_type', 'full')
+        
+        logger.info(f"Running CrewAI task: {task_type}")
+        
+        crew = AngusCrew()
+        
+        if task_type == 'analysis':
+            # For analysis tasks, we need a URL
+            url = data.get('url')
+            is_youtube = data.get('is_youtube', False)
+            
+            if not url:
+                return jsonify({'error': 'No URL provided for analysis task'}), 400
+                
+            # TODO: Implement analysis with URL parameter
+            # For now, just run the analysis task
+            result = crew.run_analysis_only()
+        elif task_type == 'upload':
+            limit = int(data.get('limit', 5))
+            result = crew.run_upload_only()
+        elif task_type == 'engagement':
+            limit = int(data.get('limit', 5))
+            result = crew.run_engagement_only()
+        else:  # full workflow
+            result = crew.run_full_workflow()
+            
+        logger.info(f"CrewAI task {task_type} completed successfully")
+        return jsonify({'result': result})
+    except Exception as e:
+        logger.error(f"Error running CrewAI task: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route(f'{URL_PREFIX}/api/crew/run', methods=['POST'])
+def push_run_crew_task():
+    """Run a CrewAI task for the push endpoint."""
+    return run_crew_task()
 
 def run_web_ui(host='0.0.0.0', port=5000, debug=False):
     """Run the web UI."""
