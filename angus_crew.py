@@ -14,15 +14,9 @@ class AngusCrew:
     Class for managing CrewAI workflows for Agent Angus.
     """
     
-    def __init__(self, use_simple_tools=False):
-        """
-        Initialize the AngusCrew with tasks from AngusTasks.
-        
-        Args:
-            use_simple_tools: Whether to use simple tools created with the @tool decorator
-        """
+    def __init__(self):
+        """Initialize the AngusCrew with tasks from AngusTasks."""
         self.tasks = AngusTasks()
-        self.use_simple_tools = use_simple_tools
         self.agents = AngusAgents()
         
     def get_full_crew(self) -> Crew:
@@ -32,11 +26,7 @@ class AngusCrew:
         Returns:
             Crew: A CrewAI crew with all agents and tasks
         """
-        if self.use_simple_tools:
-            agents = self.agents.get_all_simple_agents()
-        else:
-            agents = self.agents.get_all_agents()
-            
+        agents = self.agents.get_all_agents()
         tasks = self.tasks.get_full_workflow()
         
         return Crew(
@@ -53,11 +43,7 @@ class AngusCrew:
             str: Result of the analysis task
         """
         analysis_task = self.tasks.get_analysis_task()
-        
-        if self.use_simple_tools:
-            agent = self.agents.get_simple_analysis_agent()
-        else:
-            agent = self.agents.get_analysis_agent()
+        agent = self.agents.get_analysis_agent()
             
         crew = Crew(
             agents=[agent],
@@ -74,11 +60,7 @@ class AngusCrew:
             str: Result of the upload task
         """
         upload_task = self.tasks.get_upload_task()
-        
-        if self.use_simple_tools:
-            agent = self.agents.get_simple_upload_agent()
-        else:
-            agent = self.agents.get_upload_agent()
+        agent = self.agents.get_upload_agent()
             
         crew = Crew(
             agents=[agent],
@@ -95,11 +77,7 @@ class AngusCrew:
             str: Result of the engagement task
         """
         engagement_task = self.tasks.get_engagement_task()
-        
-        if self.use_simple_tools:
-            agent = self.agents.get_simple_engagement_agent()
-        else:
-            agent = self.agents.get_engagement_agent()
+        agent = self.agents.get_engagement_agent()
             
         crew = Crew(
             agents=[agent],

@@ -21,16 +21,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global variable for simple tools flag
-use_simple_tools = False
-
 def run_daily_uploads():
     """
     Run the upload task daily.
     """
     logger.info("Running daily uploads")
     try:
-        crew = AngusCrew(use_simple_tools=use_simple_tools)
+        crew = AngusCrew()
         result = crew.run_upload_only()
         logger.info(f"Upload result: {result}")
     except Exception as e:
@@ -42,7 +39,7 @@ def run_hourly_engagement():
     """
     logger.info("Running hourly engagement")
     try:
-        crew = AngusCrew(use_simple_tools=use_simple_tools)
+        crew = AngusCrew()
         result = crew.run_engagement_only()
         logger.info(f"Engagement result: {result}")
     except Exception as e:
@@ -54,7 +51,7 @@ def run_weekly_full_workflow():
     """
     logger.info("Running weekly full workflow")
     try:
-        crew = AngusCrew(use_simple_tools=use_simple_tools)
+        crew = AngusCrew()
         result = crew.run_full_workflow()
         logger.info(f"Full workflow result: {result}")
     except Exception as e:
@@ -64,8 +61,6 @@ def main():
     """
     Main entry point for scheduled operations.
     """
-    global use_simple_tools
-    
     parser = argparse.ArgumentParser(description='Run scheduled tasks for Agent Angus with CrewAI')
     parser.add_argument('--daily-time', type=str, default='10:00',
                         help='Time to run daily uploads (HH:MM format)')
@@ -80,15 +75,10 @@ def main():
                         help='Disable daily upload tasks')
     parser.add_argument('--disable-weekly', action='store_true',
                         help='Disable weekly full workflow tasks')
-    parser.add_argument('--simple-tools', action='store_true',
-                        help='Use simple tools created with the @tool decorator')
     
     args = parser.parse_args()
-    use_simple_tools = args.simple_tools
     
     logger.info("Starting scheduled operations")
-    if use_simple_tools:
-        logger.info("Using simple tools created with the @tool decorator")
     
     # Schedule tasks
     if not args.disable_daily:

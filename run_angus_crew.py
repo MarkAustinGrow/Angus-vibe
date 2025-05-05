@@ -32,8 +32,6 @@ def main():
                         help='Limit for number of items to process')
     parser.add_argument('--verbose', action='store_true',
                         help='Enable verbose output')
-    parser.add_argument('--simple-tools', action='store_true',
-                        help='Use simple tools created with the @tool decorator')
     
     args = parser.parse_args()
     
@@ -42,11 +40,9 @@ def main():
         logger.debug("Verbose output enabled")
     
     logger.info(f"Running task: {args.task} with limit: {args.limit}")
-    if args.simple_tools:
-        logger.info("Using simple tools created with the @tool decorator")
     
     try:
-        crew = AngusCrew(use_simple_tools=args.simple_tools)
+        crew = AngusCrew()
         
         if args.task == 'analysis':
             logger.info("Running analysis task")
