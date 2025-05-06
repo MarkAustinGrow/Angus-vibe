@@ -6,7 +6,7 @@ This module provides tool wrappers for Agent Angus functionality to be used with
 It wraps the core functionality of Agent Angus as CrewAI tools.
 """
 from angus import AgentAngus
-from crewai import Tool
+from langchain.tools import Tool
 from typing import Optional, List, Dict, Any
 
 # Initialize the AgentAngus instance
@@ -44,10 +44,7 @@ class AngusTools:
         return Tool(
             name="upload_videos",
             func=upload_videos,
-            description="Upload pending songs from Supabase to YouTube",
-            parameters=[
-                {"name": "limit", "type": "integer", "description": "Maximum number of videos to upload", "required": False}
-            ]
+            description="Upload pending songs from Supabase to YouTube"
         )
         
     def get_comment_tool(self) -> Tool:
@@ -74,11 +71,7 @@ class AngusTools:
         return Tool(
             name="manage_comments",
             func=manage_comments,
-            description="Fetch comments from YouTube videos and respond using OpenAI",
-            parameters=[
-                {"name": "limit", "type": "integer", "description": "Maximum number of videos to process", "required": False},
-                {"name": "max_replies", "type": "integer", "description": "Maximum number of replies to post", "required": False}
-            ]
+            description="Fetch comments from YouTube videos and respond using OpenAI"
         )
         
     def get_analysis_tool(self) -> Tool:
@@ -106,11 +99,7 @@ class AngusTools:
         return Tool(
             name="analyze_music",
             func=analyze_music,
-            description="Analyze music using OpenAI to extract insights about lyrics, mood, themes, and musical characteristics",
-            parameters=[
-                {"name": "url", "type": "string", "description": "URL of the music file or YouTube video", "required": True},
-                {"name": "is_youtube", "type": "boolean", "description": "Whether the URL is a YouTube video", "required": False}
-            ]
+            description="Analyze music using OpenAI to extract insights about lyrics, mood, themes, and musical characteristics"
         )
         
     def get_all_tools(self) -> List[Tool]:
