@@ -42,7 +42,7 @@ async def run_test():
     logger.info("Running Coral Protocol integration test...")
     
     # Get the server URL from environment variables or use default
-    server_url = os.getenv("CORAL_SERVER_URL", "http://localhost:3001/sse")
+    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
     
     # Create the Coral MCP Server
     coral_server = CoralMCPServer(server_url=server_url)
@@ -93,7 +93,7 @@ def main():
     server_url = os.getenv("CORAL_SERVER_URL")
     if not server_url:
         logger.warning("CORAL_SERVER_URL environment variable is not set.")
-        logger.warning("Using default URL: http://localhost:3001/sse")
+        logger.warning("Using default URL: http://coral.pushcollective.club/sse")
         logger.warning("Make sure the Coral Protocol server is running.")
     
     # Run the test

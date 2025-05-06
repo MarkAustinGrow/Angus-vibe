@@ -40,7 +40,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default Coral server URL
-DEFAULT_CORAL_SERVER_URL = os.getenv("CORAL_SERVER_URL", "http://localhost:3001/sse")
+DEFAULT_CORAL_SERVER_URL = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
 
 class CoralMCPServer:
     """

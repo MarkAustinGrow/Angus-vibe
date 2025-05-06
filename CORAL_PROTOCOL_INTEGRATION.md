@@ -55,7 +55,7 @@ This will run a simple test that connects to the Coral Protocol server, register
 
 The Coral Protocol integration can be configured using environment variables:
 
-- `CORAL_SERVER_URL`: The URL of the Coral Protocol server. Default: `http://localhost:3001/sse`
+- `CORAL_SERVER_URL`: The URL of the Coral Protocol server. Default: `http://coral.pushcollective.club/sse`
 - `CORAL_SERVER_DIR`: The directory where the Coral Protocol server is cloned. Default: `./coral-server`
 - `CORAL_SERVER_PORT`: The port on which the Coral Protocol server runs. Default: `3001`
 - `AGENT_NAME`: The name of the agent to register with the Coral Protocol. Default: `angus_agent`
