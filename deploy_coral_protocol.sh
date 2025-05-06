@@ -25,7 +25,8 @@ docker-compose down
 
 # Step 5: Rebuild the Docker containers
 echo "Rebuilding Docker containers..."
-docker-compose build
+echo "This may take some time as it installs the exact versions of dependencies..."
+docker-compose build --no-cache
 
 # Step 6: Start the containers
 echo "Starting Docker containers..."
