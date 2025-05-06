@@ -22,7 +22,7 @@ httpx==0.23.3
 sseclient-py>=1.7.2
 langchain==0.0.267
 langchain-openai==0.0.2
-langchain-core==0.1.7
+langchain-core==0.1.8
 langchain-community==0.0.10
 langchain_experimental==0.0.42
 langchain-mcp-adapters==0.0.3
