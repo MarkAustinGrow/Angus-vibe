@@ -1,0 +1,975 @@
+# Angus Coral Protocol LangChain Integration
+
+This document outlines the step-by-step process for integrating Agent Angus with the Coral Protocol using LangChain, allowing Angus to share its tools with other AI agents.
+
+## Overview
+
+The integration will enable Agent Angus to:
+
+1. Register with a Coral Protocol server
+2. Expose its tools (upload videos, manage comments, analyze music) to other agents
+3. Discover other agents on the Coral Protocol network
+4. Call functions on other agents
+5. Receive and handle function calls from other agents
+
+This integration bridges three systems:
+- Core Agent Angus functionality
+- The CrewAI integration
+- The Coral Protocol with LangChain
+
+## Prerequisites
+
+- Python 3.11 or higher
+- Agent Angus with CrewAI integration
+- LangChain (0.1.0 or higher)
+- LangChain OpenAI (if using OpenAI models)
+- A running Coral Protocol server (e.g., http://coral.pushcollective.club/sse)
+
+## Step 1: Create the Directory Structure
+
+Create the following directory structure for the Coral Protocol LangChain integration:
+
+```
+src/
+└── coral_protocol/
+    └── langchain/
+        ├── __init__.py
+        ├── config.py
+        └── runnable.py
+```
+
+## Step 2: Implement the Configuration Class
+
+Create `src/coral_protocol/langchain/config.py`:
+
+```python
+"""
+Configuration for the CoralRunnable class.
+"""
+from typing import Dict, Any, Optional
+
+
+class CoralRunnableConfig:
+    """
+    Configuration for the CoralRunnable class.
+    
+    This class holds the configuration for connecting to a Coral Protocol server
+    and registering an agent with it.
+    """
+    
+    def __init__(
+        self,
+        server_url: str,
+        did: str,
+        private_key: bytes,
+        capability_document: Dict[str, Any],
+        agent_name: Optional[str] = None,
+        agent_description: Optional[str] = None,
+    ):
+        """
+        Initialize the CoralRunnableConfig.
+        
+        Args:
+            server_url: URL of the Coral server
+            did: DID of the agent
+            private_key: Private key as bytes
+            capability_document: Capability document for the agent
+            agent_name: Name of the agent (optional)
+            agent_description: Description of the agent (optional)
+        """
+        self.server_url = server_url
+        self.did = did
+        self.private_key = private_key
+        self.capability_document = capability_document
+        self.agent_name = agent_name or "Agent Angus"
+        self.agent_description = agent_description or "AI agent for YouTube publishing and audience engagement"
+```
+
+## Step 3: Implement the Package Initialization
+
+Create `src/coral_protocol/langchain/__init__.py`:
+
+```python
+"""
+Coral Protocol LangChain Integration
+
+This package provides integration between LangChain and the Coral Protocol.
+"""
+
+from src.coral_protocol.langchain.runnable import CoralRunnable
+from src.coral_protocol.langchain.config import CoralRunnableConfig
+
+__all__ = ["CoralRunnable", "CoralRunnableConfig"]
+```
+
+## Step 4: Implement the CoralRunnable Class
+
+Create `src/coral_protocol/langchain/runnable.py`:
+
+```python
+"""
+CoralRunnable class for integrating with the Coral Protocol.
+"""
+import json
+import logging
+import threading
+import time
+from typing import Dict, Any, List, Callable, Optional, Union, Tuple
+
+import requests
+from langchain.schema.runnable import Runnable
+
+from src.coral_protocol.langchain.config import CoralRunnableConfig
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class CoralRunnable:
+    """
+    A LangChain Runnable that integrates with the Coral Protocol.
+    
+    This class allows exposing functions through the Coral Protocol and
+    calling functions on other agents.
+    """
+    
+    def __init__(
+        self,
+        functions: Dict[str, Callable],
+        config: CoralRunnableConfig
+    ):
+        """
+        Initialize the CoralRunnable.
+        
+        Args:
+            functions: Dictionary mapping function names to callables
+            config: Configuration for the Coral Protocol integration
+        """
+        self.functions = functions
+        self.config = config
+        
+        # Register with the Coral server
+        self._register_with_server()
+        
+        # Server for handling incoming requests
+        self.server_thread = None
+        self.server_running = False
+    
+    def _register_with_server(self) -> None:
+        """Register with the Coral server."""
+        try:
+            # Create registration payload
+            payload = {
+                "did": self.config.did,
+                "capability_document": self.config.capability_document,
+                "name": self.config.agent_name,
+                "description": self.config.agent_description
+            }
+            
+            # Sign the payload
+            signature = self._sign_payload(payload)
+            
+            # Send registration request
+            headers = {
+                "Content-Type": "application/json",
+                "X-Signature": signature
+            }
+            
+            response = requests.post(
+                f"{self.config.server_url}/register",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully registered with Coral server at {self.config.server_url}")
+            else:
+                logger.error(f"Failed to register with Coral server: {response.text}")
+        except Exception as e:
+            logger.error(f"Error registering with Coral server: {str(e)}")
+    
+    def _sign_payload(self, payload: Dict[str, Any]) -> str:
+        """
+        Sign a payload with the private key.
+        
+        Args:
+            payload: Payload to sign
+            
+        Returns:
+            Signature as a string
+        """
+        # In a real implementation, this would use cryptography to sign the payload
+        # For now, we'll just return a placeholder
+        return "signature_placeholder"
+    
+    def call_agent(self, agent_did: str, function_name: str, **kwargs) -> Any:
+        """
+        Call a function on another agent.
+        
+        Args:
+            agent_did: DID of the agent to call
+            function_name: Name of the function to call
+            **kwargs: Arguments to pass to the function
+            
+        Returns:
+            Result of the function call
+        """
+        try:
+            # Create function call payload
+            payload = {
+                "did": self.config.did,
+                "target_did": agent_did,
+                "function": function_name,
+                "arguments": kwargs
+            }
+            
+            # Sign the payload
+            signature = self._sign_payload(payload)
+            
+            # Send function call request
+            headers = {
+                "Content-Type": "application/json",
+                "X-Signature": signature
+            }
+            
+            response = requests.post(
+                f"{self.config.server_url}/call",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully called {function_name} on agent {agent_did}")
+                return response.json().get("result")
+            else:
+                logger.error(f"Failed to call function: {response.text}")
+                return {"status": "failed", "error": response.text}
+        except Exception as e:
+            logger.error(f"Error calling function: {str(e)}")
+            return {"status": "failed", "error": str(e)}
+    
+    def discover_agents(self) -> List[Dict[str, Any]]:
+        """
+        Discover agents registered with the Coral server.
+        
+        Returns:
+            List of dictionaries containing agent information
+        """
+        try:
+            # Create discovery payload
+            payload = {
+                "did": self.config.did
+            }
+            
+            # Sign the payload
+            signature = self._sign_payload(payload)
+            
+            # Send discovery request
+            headers = {
+                "Content-Type": "application/json",
+                "X-Signature": signature
+            }
+            
+            response = requests.get(
+                f"{self.config.server_url}/discover",
+                headers=headers,
+                params=payload
+            )
+            
+            if response.status_code == 200:
+                logger.info("Successfully discovered agents")
+                return response.json().get("agents", [])
+            else:
+                logger.error(f"Failed to discover agents: {response.text}")
+                return []
+        except Exception as e:
+            logger.error(f"Error discovering agents: {str(e)}")
+            return []
+    
+    def get_agent_capabilities(self, agent_did: str) -> Dict[str, Any]:
+        """
+        Get the capabilities of an agent.
+        
+        Args:
+            agent_did: DID of the agent
+            
+        Returns:
+            Dictionary containing the agent's capabilities
+        """
+        try:
+            # Create capabilities payload
+            payload = {
+                "did": self.config.did,
+                "target_did": agent_did
+            }
+            
+            # Sign the payload
+            signature = self._sign_payload(payload)
+            
+            # Send capabilities request
+            headers = {
+                "Content-Type": "application/json",
+                "X-Signature": signature
+            }
+            
+            response = requests.get(
+                f"{self.config.server_url}/capabilities",
+                headers=headers,
+                params=payload
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully retrieved capabilities for agent {agent_did}")
+                return response.json().get("capabilities", {})
+            else:
+                logger.error(f"Failed to get agent capabilities: {response.text}")
+                return {}
+        except Exception as e:
+            logger.error(f"Error getting agent capabilities: {str(e)}")
+            return {}
+    
+    def start_server(self, host: str = '0.0.0.0', port: int = 5001) -> None:
+        """
+        Start a server to listen for requests from the Coral Protocol.
+        
+        Args:
+            host: Host to bind to
+            port: Port to bind to
+        """
+        if self.server_running:
+            logger.warning("Server is already running")
+            return
+        
+        self.server_running = True
+        self.server_thread = threading.Thread(
+            target=self._run_server,
+            args=(host, port),
+            daemon=True
+        )
+        self.server_thread.start()
+        
+        logger.info(f"Started server on {host}:{port}")
+    
+    def _run_server(self, host: str, port: int) -> None:
+        """
+        Run the server.
+        
+        Args:
+            host: Host to bind to
+            port: Port to bind to
+        """
+        # In a real implementation, this would start a web server
+        # For now, we'll just simulate it with a loop
+        try:
+            while self.server_running:
+                time.sleep(1)
+        except Exception as e:
+            logger.error(f"Error in server thread: {str(e)}")
+            self.server_running = False
+    
+    def stop_server(self) -> None:
+        """Stop the server."""
+        if not self.server_running:
+            logger.warning("Server is not running")
+            return
+        
+        self.server_running = False
+        if self.server_thread:
+            self.server_thread.join(timeout=5)
+            
+        logger.info("Stopped server")
+```
+
+## Step 5: Create the Adapter for Angus
+
+Create a new file `angus_coral_langchain_adapter.py`:
+
+```python
+"""
+Coral Protocol LangChain Integration for Angus
+
+This module provides integration between Angus and the Coral Protocol
+using LangChain.
+"""
+import os
+import json
+import logging
+from typing import Dict, Any, List, Optional
+
+from src.coral_protocol.langchain import CoralRunnable, CoralRunnableConfig
+from langchain.schema.runnable import Runnable
+from langchain_openai import ChatOpenAI
+
+# Import Angus components
+from angus import AgentAngus
+from angus_tools import AngusTools
+from angus_crew import AngusCrew
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class AngusCoralLangChainAdapter:
+    """
+    Adapter for integrating Angus with the Coral Protocol using LangChain.
+    
+    This class provides functionality for:
+    - Registering Angus's capabilities with a Coral server
+    - Handling requests from other agents through the Coral Protocol
+    - Sending requests to other agents through the Coral Protocol
+    """
+    
+    def __init__(self, 
+                 coral_server_url: str,
+                 openai_api_key: Optional[str] = None,
+                 did_domain: str = "angus.ai",
+                 private_key_path: Optional[str] = None):
+        """
+        Initialize the Angus Coral LangChain Adapter.
+        
+        Args:
+            coral_server_url: URL of the Coral server
+            openai_api_key: API key for OpenAI (optional, will use environment variable if not provided)
+            did_domain: Domain for the did:web identifier
+            private_key_path: Path to a file containing a private key for DID
+        """
+        # Initialize Angus components
+        self.angus_agent = AgentAngus()
+        self.angus_tools = AngusTools()
+        self.angus_crew = AngusCrew()
+        
+        self.coral_server_url = coral_server_url
+        self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
+        
+        # Initialize DID (in a real implementation, this would use a proper DID library)
+        self.did = f"did:web:{did_domain}"
+        self.private_key = self._get_or_create_private_key(private_key_path)
+        
+        # Create capability document
+        self.capability_document = self._create_capability_document()
+        
+        # Create Coral runnable configuration
+        self.coral_config = CoralRunnableConfig(
+            server_url=coral_server_url,
+            did=self.did,
+            private_key=self.private_key,
+            capability_document=self.capability_document,
+            agent_name="Agent Angus",
+            agent_description="AI agent for YouTube publishing and audience engagement"
+        )
+        
+        # Create Coral runnable
+        self.coral_runnable = self._create_coral_runnable()
+        
+        logger.info(f"AngusCoralLangChainAdapter initialized with DID: {self.did}")
+        logger.info(f"Connected to Coral server at: {coral_server_url}")
+    
+    def _get_or_create_private_key(self, private_key_path: Optional[str]) -> bytes:
+        """
+        Get or create a private key for DID.
+        
+        Args:
+            private_key_path: Path to a file containing a private key
+            
+        Returns:
+            Private key as bytes
+        """
+        if private_key_path and os.path.exists(private_key_path):
+            with open(private_key_path, 'rb') as f:
+                return f.read()
+        
+        # In a real implementation, this would generate a proper private key
+        # For now, we'll just return a placeholder
+        return b'placeholder_private_key'
+    
+    def _create_capability_document(self) -> Dict[str, Any]:
+        """
+        Create a capability document for Angus.
+        
+        Returns:
+            Dictionary containing Angus's capabilities
+        """
+        return {
+            "name": "Agent Angus",
+            "description": "AI agent for YouTube publishing and audience engagement",
+            "functions": [
+                {
+                    "name": "upload_videos",
+                    "description": "Upload pending songs from Supabase to YouTube",
+                    "parameters": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of videos to upload",
+                            "default": 5
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "success": {"type": "boolean"},
+                            "count": {"type": "integer"},
+                            "message": {"type": "string"}
+                        }
+                    }
+                },
+                {
+                    "name": "manage_comments",
+                    "description": "Fetch comments from YouTube videos and respond using OpenAI",
+                    "parameters": {
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of videos to process",
+                            "default": 10
+                        },
+                        "max_replies": {
+                            "type": "integer",
+                            "description": "Maximum number of replies to post",
+                            "default": 5
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "properties": {
+                            "success": {"type": "boolean"},
+                            "count": {"type": "integer"},
+                            "message": {"type": "string"}
+                        }
+                    }
+                },
+                {
+                    "name": "analyze_music",
+                    "description": "Analyze music using OpenAI to extract insights",
+                    "parameters": {
+                        "url": {
+                            "type": "string",
+                            "description": "URL of the music file or YouTube video"
+                        },
+                        "is_youtube": {
+                            "type": "boolean",
+                            "description": "Whether the URL is a YouTube video",
+                            "default": False
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "OpenAI model to use",
+                            "default": "gpt-4o",
+                            "enum": ["gpt-4o", "gpt-4", "gpt-3.5-turbo"]
+                        }
+                    },
+                    "returns": {
+                        "type": "object",
+                        "description": "Detailed music analysis including lyrics, genres, moods, and more"
+                    }
+                }
+            ]
+        }
+    
+    def _create_coral_runnable(self) -> CoralRunnable:
+        """
+        Create a Coral runnable with Angus's capabilities.
+        
+        Returns:
+            CoralRunnable instance
+        """
+        # Define the functions to expose through Coral
+        functions = {
+            "upload_videos": self._handle_upload_videos,
+            "manage_comments": self._handle_manage_comments,
+            "analyze_music": self._handle_analyze_music
+        }
+        
+        # Create the Coral runnable
+        coral_runnable = CoralRunnable(
+            functions=functions,
+            config=self.coral_config
+        )
+        
+        return coral_runnable
+    
+    def _handle_upload_videos(self, limit: int = 5) -> Dict[str, Any]:
+        """
+        Handle upload_videos function call from Coral Protocol.
+        
+        Args:
+            limit: Maximum number of videos to upload
+            
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            # Use the Angus agent to upload videos
+            count = self.angus_agent.upload_all_pending_songs(limit=limit)
+            
+            return {
+                "success": True,
+                "count": count,
+                "message": f"Successfully uploaded {count} videos to YouTube"
+            }
+        except Exception as e:
+            logger.error(f"Error handling upload_videos: {str(e)}")
+            
+            # Check if this is an upload limit exceeded error
+            error_str = str(e)
+            if "uploadLimitExceeded" in error_str or "The user has exceeded the number of videos they may upload" in error_str:
+                return {
+                    "success": False,
+                    "count": 0,
+                    "message": "YouTube upload limit exceeded. Try again later.",
+                    "error": "UPLOAD_LIMIT_EXCEEDED"
+                }
+            
+            return {
+                "success": False,
+                "count": 0,
+                "message": f"Error uploading videos: {str(e)}",
+                "error": "UPLOAD_ERROR"
+            }
+    
+    def _handle_manage_comments(self, limit: int = 10, max_replies: int = 5) -> Dict[str, Any]:
+        """
+        Handle manage_comments function call from Coral Protocol.
+        
+        Args:
+            limit: Maximum number of videos to process
+            max_replies: Maximum number of replies to post
+            
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            # Use the Angus agent to manage comments
+            count = self.angus_agent.fetch_comments_for_all_videos(limit=limit, max_total_replies=max_replies)
+            
+            return {
+                "success": True,
+                "count": count,
+                "message": f"Processed {count} comments across YouTube videos"
+            }
+        except Exception as e:
+            logger.error(f"Error handling manage_comments: {str(e)}")
+            return {
+                "success": False,
+                "count": 0,
+                "message": f"Error managing comments: {str(e)}",
+                "error": "COMMENT_ERROR"
+            }
+    
+    def _handle_analyze_music(self, url: str, is_youtube: bool = False, model: str = "gpt-4o") -> Dict[str, Any]:
+        """
+        Handle analyze_music function call from Coral Protocol.
+        
+        Args:
+            url: URL of the music file or YouTube video
+            is_youtube: Whether the URL is a YouTube video
+            model: OpenAI model to use
+            
+        Returns:
+            Dictionary with analysis results
+        """
+        try:
+            # Import the analyze_music function from openai_utils
+            from openai_utils import analyze_music
+            
+            # Analyze the music
+            result = analyze_music(url, is_youtube_url=is_youtube, model=model)
+            
+            # Check if there was an error
+            if "error" in result:
+                return {
+                    "success": False,
+                    "message": f"Error analyzing music: {result.get('details', 'Unknown error')}",
+                    "error": "ANALYSIS_ERROR"
+                }
+            
+            # Return the analysis results
+            return {
+                "success": True,
+                "message": "Successfully analyzed music",
+                "analysis": result
+            }
+        except Exception as e:
+            logger.error(f"Error handling analyze_music: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error analyzing music: {str(e)}",
+                "error": "ANALYSIS_ERROR"
+            }
+    
+    def register_with_coral_server(self) -> bool:
+        """
+        Register Angus's capabilities with the Coral server.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # The registration happens automatically when the CoralRunnable is created
+            # We just need to make sure it's initialized
+            if self.coral_runnable:
+                logger.info(f"Successfully registered with Coral server at {self.coral_server_url}")
+                return True
+            else:
+                logger.error("Coral runnable not initialized")
+                return False
+        except Exception as e:
+            logger.error(f"Error registering with Coral server: {str(e)}")
+            return False
+    
+    def call_agent(self, agent_did: str, function_name: str, **kwargs) -> Any:
+        """
+        Call a function on another agent through the Coral Protocol.
+        
+        Args:
+            agent_did: DID of the agent to call
+            function_name: Name of the function to call
+            **kwargs: Arguments to pass to the function
+            
+        Returns:
+            Result of the function call
+        """
+        try:
+            logger.info(f"Calling {function_name} on agent {agent_did}")
+            
+            # Create the function call
+            result = self.coral_runnable.call_agent(
+                agent_did=agent_did,
+                function_name=function_name,
+                **kwargs
+            )
+            
+            logger.info(f"Successfully called {function_name} on agent {agent_did}")
+            return result
+        except Exception as e:
+            logger.error(f"Error calling agent {agent_did}: {str(e)}")
+            return {"status": "failed", "error": str(e)}
+    
+    def discover_agents(self) -> List[Dict[str, Any]]:
+        """
+        Discover agents registered with the Coral server.
+        
+        Returns:
+            List of dictionaries containing agent information
+        """
+        try:
+            logger.info(f"Discovering agents on Coral server {self.coral_server_url}")
+            
+            # Get the list of agents
+            agents = self.coral_runnable.discover_agents()
+            
+            logger.info(f"Discovered {len(agents)} agents")
+            return agents
+        except Exception as e:
+            logger.error(f"Error discovering agents: {str(e)}")
+            return []
+    
+    def get_agent_capabilities(self, agent_did: str) -> Dict[str, Any]:
+        """
+        Get the capabilities of an agent.
+        
+        Args:
+            agent_did: DID of the agent
+            
+        Returns:
+            Dictionary containing the agent's capabilities
+        """
+        try:
+            logger.info(f"Getting capabilities for agent {agent_did}")
+            
+            # Get the agent's capabilities
+            capabilities = self.coral_runnable.get_agent_capabilities(agent_did)
+            
+            logger.info(f"Successfully retrieved capabilities for agent {agent_did}")
+            return capabilities
+        except Exception as e:
+            logger.error(f"Error getting capabilities for agent {agent_did}: {str(e)}")
+            return {}
+    
+    def start_server(self, host: str = '0.0.0.0', port: int = 5001) -> None:
+        """
+        Start a server to listen for requests from the Coral Protocol.
+        
+        Args:
+            host: Host to bind to
+            port: Port to bind to
+        """
+        try:
+            logger.info(f"Starting Coral server on {host}:{port}")
+            
+            # Start the server
+            self.coral_runnable.start_server(host=host, port=port)
+            
+            logger.info(f"Coral server started on {host}:{port}")
+        except Exception as e:
+            logger.error(f"Error starting Coral server: {str(e)}")
+            raise
+```
+
+## Step 6: Create a CrewAI Tool for Coral Protocol
+
+Create a new file `coral_protocol_tool.py`:
+
+```python
+"""
+CrewAI Tool for Coral Protocol
+
+This module provides a CrewAI tool for interacting with the Coral Protocol.
+"""
+from typing import Dict, Any, List, Optional
+from crewai.tools import BaseTool
+from pydantic import BaseModel, Field
+
+class CoralProtocolInput(BaseModel):
+    """Input schema for the Coral Protocol tool."""
+    agent_did: str = Field(..., description="DID of the agent to call")
+    function_name: str = Field(..., description="Name of the function to call")
+    arguments: Dict[str, Any] = Field(default_factory=dict, description="Arguments to pass to the function")
+
+class CoralProtocolTool(BaseTool):
+    """Tool for interacting with the Coral Protocol."""
+    
+    name: str = "coral_protocol"
+    description: str = "Call functions on other agents through the Coral Protocol"
+    args_schema: type[BaseModel] = CoralProtocolInput
+    
+    def __init__(self, coral_adapter):
+        """
+        Initialize the Coral Protocol Tool.
+        
+        Args:
+            coral_adapter: An instance of AngusCoralLangChainAdapter
+        """
+        super().__init__()
+        self.coral_adapter = coral_adapter
+    
+    def _run(self, agent_did: str, function_name: str, arguments: Dict[str, Any] = None) -> Any:
+        """
+        Call a function on another agent through the Coral Protocol.
+        
+        Args:
+            agent_did: DID of the agent to call
+            function_name: Name of the function to call
+            arguments: Arguments to pass to the function
+            
+        Returns:
+            Result of the function call
+        """
+        if arguments is None:
+            arguments = {}
+        
+        return self.coral_adapter.call_agent(agent_did, function_name, **arguments)
+```
+
+## Step 7: Create a Test Script
+
+Create a test script `test_angus_coral_langchain.py`:
+
+```python
+#!/usr/bin/env python
+"""
+Test script for the Coral Protocol LangChain integration with Angus.
+
+This script demonstrates how to use the AngusCoralLangChainAdapter to connect
+Angus to a Coral Protocol server using LangChain.
+"""
+import os
+import json
+import logging
+import argparse
+from pprint import pprint
+
+from angus_coral_langchain_adapter import AngusCoralLangChainAdapter
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+def test_coral_connection(coral_server_url):
+    """
+    Test the connection to a Coral Protocol server.
+    
+    Args:
+        coral_server_url: URL of the Coral server
+    """
+    print(f"\n=== Testing Coral Protocol Connection to {coral_server_url} ===\n")
+    
+    try:
+        # Initialize Coral adapter
+        coral_adapter = AngusCoralLangChainAdapter(
+            coral_server_url=coral_server_url
+        )
+        
+        # Register with Coral server
+        success = coral_adapter.register_with_coral_server()
+        
+        if success:
+            print("Successfully registered with Coral server")
+        else:
+            print("Failed to register with Coral server")
+            return False
+        
+        # Discover agents
+        print("\nDiscovering agents on Coral server...")
+        agents = coral_adapter.discover_agents()
+        
+        if agents:
+            print(f"Discovered {len(agents)} agents:")
+            for agent in agents:
+                print(f"  - {agent.get('name', 'Unknown')} ({agent.get('did', 'Unknown DID')})")
+        else:
+            print("No agents discovered")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error testing Coral connection: {str(e)}")
+        return False
+
+def test_agent_capabilities(coral_server_url, agent_did):
+    """
+    Test getting the capabilities of an agent.
+    
+    Args:
+        coral_server_url: URL of the Coral server
+        agent_did: DID of the agent to get capabilities for
+    """
+    print(f"\n=== Testing Agent Capabilities for {agent_did} ===\n")
+    
+    try:
+        # Initialize Coral adapter
+        coral_adapter = AngusCoralLangChainAdapter(
+            coral_server_url=coral_server_url
+        )
+        
+        # Get agent capabilities
+        print(f"Getting capabilities for agent {agent_did}...")
+        capabilities = coral_adapter.get_agent_capabilities(agent_did)
+        
+        if capabilities:
+            print("Agent capabilities:")
+            pprint(capabilities)
+        else:
+            print("Failed to get agent capabilities")
+            return False
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error testing agent capabilities: {str(e)}")
+        return False
+
+def test_agent_call(coral_server_url, agent_did, function_name, **kwargs):
+    """
+    Test calling a function on another agent.
+    
+    Args:
+        coral_server_url: URL of the Coral server
+        agent_did: DID of the agent to call
+        function_name: Name of the function to call
+        **kwargs: Arguments to pass to the function
+    """
+    print(f"\n=== Testing Agent Call to {agent_did}.{function_name} ===\n")
+    
+    try:
+        # Initialize Coral
