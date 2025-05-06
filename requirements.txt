@@ -20,7 +20,7 @@ httpx==0.23.3
 
 # Coral Protocol integration
 sseclient-py>=1.7.2
-langchain==0.0.267
+langchain==0.0.308
 langchain-openai==0.0.2
 langchain-core==0.1.8
 langchain-community==0.0.10
