@@ -1,0 +1,3 @@
+@echo off
+echo Starting local Coral Protocol server...
+python run_local_coral_server.py

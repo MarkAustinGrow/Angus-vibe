@@ -1,0 +1,3 @@
+@echo off
+echo Running Coral Protocol integration test...
+python run_coral_test.py
