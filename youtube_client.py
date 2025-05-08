@@ -169,6 +169,7 @@ class YouTubeClient:
             
         Returns:
             YouTube video ID if successful, None otherwise
+            Special return value "URL_EXPIRED" if the URL is expired or inaccessible
         """
         logger.info(f"Uploading video: {title}")
         
@@ -178,8 +179,16 @@ class YouTubeClient:
         
         try:
             # Download the video
-            response = requests.get(video_url, stream=True)
-            response.raise_for_status()  # Raise exception for HTTP errors
+            try:
+                response = requests.get(video_url, stream=True)
+                response.raise_for_status()  # Raise exception for HTTP errors
+            except requests.HTTPError as e:
+                if e.response.status_code == 403:
+                    logger.warning(f"URL expired or access denied: {video_url}")
+                    return "URL_EXPIRED"  # Special return value for expired URLs
+                else:
+                    # Re-raise other HTTP errors
+                    raise
             
             with open(temp_video_path, 'wb') as temp_file:
                 for chunk in response.iter_content(chunk_size=8192):

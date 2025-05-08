@@ -247,6 +247,30 @@ class AgentAngus:
                 tags=tags
             )
             
+            # Check for the special URL_EXPIRED return value
+            if youtube_id == "URL_EXPIRED":
+                # Record URL expired status in the database
+                youtube_data = {
+                    "song_id": song_id,
+                    "status": "url_expired",  # New status for expired URLs
+                    "title": title,
+                    "description": "Upload failed: URL expired or inaccessible"
+                }
+                
+                # Update existing record or insert new one
+                if existing_records:
+                    # Update the first record
+                    record_id = existing_records[0].get('id')
+                    self.supabase.client.table("youtube").update(youtube_data).eq("id", record_id).execute()
+                    logger.info(f"Updated existing record {record_id} with URL expired status")
+                else:
+                    # Insert new record
+                    self.supabase.client.table("youtube").insert(youtube_data).execute()
+                    logger.info(f"Inserted new record with URL expired status")
+                
+                # Return None to indicate upload did not succeed
+                return None
+            
             if not youtube_id:
                 upload_error = "Upload failed - no YouTube ID returned"
                 logger.error(f"Failed to upload song '{title}' to YouTube")
