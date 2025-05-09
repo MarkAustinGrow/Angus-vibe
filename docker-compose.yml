@@ -39,7 +39,7 @@ services:
     env_file:
       - .env
     environment:
-      - CORAL_SERVER_URL=https://coral.pushcollective.club/sse
+      - CORAL_SERVER_URL=http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse
     logging:
       driver: "json-file"
       options:
