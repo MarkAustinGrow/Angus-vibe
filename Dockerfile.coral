@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Copy necessary files
 COPY requirements.coral.txt .
+COPY config.py .
 COPY supabase_client.py .
 COPY youtube_client.py .
 COPY angus_coral_agent.py .
