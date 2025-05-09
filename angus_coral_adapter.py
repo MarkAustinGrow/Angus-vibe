@@ -127,7 +127,43 @@ class AngusCoralAdapter:
         try:
             logger.info("Discovering agents on Coral Protocol server")
             
-            # List agents
+            # Check if we have a session ID
+            if hasattr(self.coral_runnable, 'session_id') and self.coral_runnable.session_id:
+                # Construct the discover URL using the session ID
+                from urllib.parse import urlparse, urljoin
+                
+                parsed_url = urlparse(self.coral_server_url)
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
+                discover_url = f"{base_url}/devmode/default-app/default-key/session1/discover?sessionId={self.coral_runnable.session_id}"
+                
+                logger.info(f"Using session-based discovery URL: {discover_url}")
+                
+                # Make the request
+                response = requests.get(
+                    discover_url,
+                    headers=self.coral_runnable.config.headers,
+                    timeout=self.coral_runnable.config.timeout,
+                    verify=self.coral_runnable.config.verify_ssl
+                )
+                
+                if response.status_code == 200:
+                    agents = response.json().get("agents", [])
+                    logger.info(f"Discovered {len(agents)} agents using session-based discovery")
+                    
+                    # Log each discovered agent
+                    for agent in agents:
+                        logger.info(f"  - {agent.get('name', 'Unknown')} ({agent.get('did', 'Unknown DID')})")
+                    
+                    # Store the discovered agents
+                    if hasattr(self.coral_runnable, 'known_agents'):
+                        self.coral_runnable.known_agents = agents
+                    
+                    return agents
+                else:
+                    logger.warning(f"Session-based discovery failed: {response.status_code} - {response.text}")
+            
+            # Fall back to the list_agents method
+            logger.info("Falling back to standard agent listing")
             agents = self.coral_runnable.list_agents()
             
             logger.info(f"Discovered {len(agents)} agents on Coral Protocol server")
@@ -201,11 +237,41 @@ class AngusCoralAdapter:
         try:
             logger.info(f"Getting capabilities for agent {agent_did}")
             
-            # This would call a method on the Coral runnable to get agent capabilities
-            # For now, we'll return a placeholder
+            # Check if we have a session ID
+            if hasattr(self.coral_runnable, 'session_id') and self.coral_runnable.session_id:
+                # Construct the capabilities URL using the session ID
+                from urllib.parse import urlparse, urljoin
+                
+                parsed_url = urlparse(self.coral_server_url)
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
+                capabilities_url = f"{base_url}/devmode/default-app/default-key/session1/capabilities?sessionId={self.coral_runnable.session_id}&targetDid={agent_did}"
+                
+                logger.info(f"Using session-based capabilities URL: {capabilities_url}")
+                
+                # Make the request
+                response = requests.get(
+                    capabilities_url,
+                    headers=self.coral_runnable.config.headers,
+                    timeout=self.coral_runnable.config.timeout,
+                    verify=self.coral_runnable.config.verify_ssl
+                )
+                
+                if response.status_code == 200:
+                    capabilities = response.json()
+                    logger.info(f"Successfully retrieved capabilities for agent {agent_did}")
+                    
+                    # Log the capabilities
+                    if "services" in capabilities:
+                        logger.info(f"Agent provides {len(capabilities['services'])} services:")
+                        for service in capabilities["services"]:
+                            logger.info(f"  - {service.get('id')}: {service.get('description', 'No description')}")
+                    
+                    return capabilities
+                else:
+                    logger.warning(f"Session-based capabilities retrieval failed: {response.status_code} - {response.text}")
             
-            logger.info(f"Simulating getting capabilities for agent {agent_did}")
-            
+            # Fall back to the placeholder implementation
+            logger.warning("Using placeholder implementation for agent capabilities")
             return {
                 "name": "Example Agent",
                 "description": "An example agent",
@@ -249,8 +315,55 @@ class AngusCoralAdapter:
         try:
             logger.info(f"Calling function {function_name} on agent {agent_did}")
             
-            # This would create a thread, send a message with the function call,
-            # and wait for a response
+            # Check if we have a message endpoint and session ID
+            if (hasattr(self.coral_runnable, 'message_endpoint') and self.coral_runnable.message_endpoint and
+                hasattr(self.coral_runnable, 'session_id') and self.coral_runnable.session_id):
+                
+                import uuid
+                
+                # Construct the message payload
+                payload = {
+                    "type": "function_call",
+                    "source": self.did_manager.did,
+                    "target": agent_did,
+                    "function": function_name,
+                    "arguments": kwargs,
+                    "id": str(uuid.uuid4())
+                }
+                
+                # Construct the message URL
+                from urllib.parse import urlparse, urljoin
+                
+                parsed_url = urlparse(self.coral_server_url)
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                
+                # Check if the message endpoint is a relative URL
+                message_endpoint = self.coral_runnable.message_endpoint
+                if not message_endpoint.startswith('http'):
+                    message_url = urljoin(base_url, f"{message_endpoint}?sessionId={self.coral_runnable.session_id}")
+                else:
+                    # It's an absolute URL
+                    message_url = f"{message_endpoint}?sessionId={self.coral_runnable.session_id}"
+                
+                logger.info(f"Using direct message URL for function call: {message_url}")
+                
+                # Send the function call
+                response = requests.post(
+                    message_url,
+                    headers=self.coral_runnable.config.headers,
+                    json=payload,
+                    timeout=self.coral_runnable.config.timeout,
+                    verify=self.coral_runnable.config.verify_ssl
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Successfully sent function call to agent {agent_did}")
+                    return {"status": "sent", "message_id": payload["id"]}
+                else:
+                    logger.warning(f"Direct function call failed: {response.status_code} - {response.text}")
+            
+            # Fall back to the thread-based approach
+            logger.info("Falling back to thread-based function call approach")
             
             # Create thread
             thread_id = self.create_thread()
@@ -281,6 +394,125 @@ class AngusCoralAdapter:
         except Exception as e:
             logger.error(f"Error calling function {function_name} on agent {agent_did}: {str(e)}")
             return None
+    
+    def _handle_function_call(self, message_data: Dict[str, Any]):
+        """
+        Handle a function call from another agent.
+        
+        Args:
+            message_data: Message data
+        """
+        try:
+            # Extract function call details
+            source_did = message_data.get("source")
+            function_name = message_data.get("function")
+            arguments = message_data.get("arguments", {})
+            message_id = message_data.get("id")
+            
+            logger.info(f"Received function call from {source_did}: {function_name}")
+            logger.info(f"Arguments: {arguments}")
+            
+            # Check if the function exists
+            if function_name in self.coral_runnable.functions:
+                # Call the function
+                try:
+                    result = self.coral_runnable.functions[function_name](**arguments)
+                    
+                    # Send the response
+                    self._send_function_response(source_did, message_id, result)
+                except Exception as e:
+                    logger.error(f"Error executing function {function_name}: {str(e)}")
+                    self._send_function_response(source_did, message_id, {"error": str(e)}, success=False)
+            else:
+                logger.warning(f"Function {function_name} not found")
+                self._send_function_response(source_did, message_id, {"error": f"Function {function_name} not found"}, success=False)
+        except Exception as e:
+            logger.error(f"Error handling function call: {str(e)}")
+    
+    def _send_function_response(self, target_did: str, message_id: str, result: Any, success: bool = True):
+        """
+        Send a function response to another agent.
+        
+        Args:
+            target_did: DID of the target agent
+            message_id: ID of the message being responded to
+            result: Result of the function call
+            success: Whether the function call was successful
+        """
+        try:
+            import uuid
+            
+            # Construct the response payload
+            payload = {
+                "type": "function_response",
+                "source": self.did_manager.did,
+                "target": target_did,
+                "in_response_to": message_id,
+                "success": success,
+                "result": result,
+                "id": str(uuid.uuid4())
+            }
+            
+            # Check if we have a message endpoint and session ID
+            if (hasattr(self.coral_runnable, 'message_endpoint') and self.coral_runnable.message_endpoint and
+                hasattr(self.coral_runnable, 'session_id') and self.coral_runnable.session_id):
+                
+                # Construct the message URL
+                from urllib.parse import urlparse, urljoin
+                
+                parsed_url = urlparse(self.coral_server_url)
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                
+                # Check if the message endpoint is a relative URL
+                message_endpoint = self.coral_runnable.message_endpoint
+                if not message_endpoint.startswith('http'):
+                    message_url = urljoin(base_url, f"{message_endpoint}?sessionId={self.coral_runnable.session_id}")
+                else:
+                    # It's an absolute URL
+                    message_url = f"{message_endpoint}?sessionId={self.coral_runnable.session_id}"
+                
+                logger.info(f"Using direct message URL for function response: {message_url}")
+                
+                # Send the function response
+                response = requests.post(
+                    message_url,
+                    headers=self.coral_runnable.config.headers,
+                    json=payload,
+                    timeout=self.coral_runnable.config.timeout,
+                    verify=self.coral_runnable.config.verify_ssl
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Successfully sent function response to agent {target_did}")
+                else:
+                    logger.error(f"Failed to send function response: {response.status_code} - {response.text}")
+            else:
+                logger.error("Cannot send function response: no message endpoint or session ID available")
+        except Exception as e:
+            logger.error(f"Error sending function response: {str(e)}")
+    
+    def _handle_function_response(self, message_data: Dict[str, Any]):
+        """
+        Handle a function response from another agent.
+        
+        Args:
+            message_data: Message data
+        """
+        try:
+            # Extract function response details
+            source_did = message_data.get("source")
+            in_response_to = message_data.get("in_response_to")
+            success = message_data.get("success", False)
+            result = message_data.get("result")
+            
+            logger.info(f"Received function response from {source_did} for message {in_response_to}")
+            logger.info(f"Success: {success}")
+            logger.info(f"Result: {result}")
+            
+            # TODO: Handle the function response, e.g., by notifying a waiting thread
+            
+        except Exception as e:
+            logger.error(f"Error handling function response: {str(e)}")
     
     def start_server(self, host: str = '0.0.0.0', port: int = 5002):
         """
