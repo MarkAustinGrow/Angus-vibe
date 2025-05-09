@@ -23,7 +23,11 @@ Agent Angus consists of several key components that work together:
 5. **Sonoteller Client (sonoteller_client.py)**: [DEPRECATED] Previously handled interactions with the Sonoteller API for music analysis. Retained for reference but no longer used.
 6. **Web UI (web_ui.py)**: Provides a web interface for analyzing music using the OpenAI API.
 7. **Database Schema (create_youtube_table.sql)**: Defines the structure of the YouTube table in Supabase.
-8. **Test Scripts**: Various scripts to test different aspects of the system.
+8. **Coral Protocol Integration**: Enables Angus to participate in a multi-agent ecosystem:
+   - **Angus Coral Agent (angus_coral_agent.py)**: Registers with the Coral Protocol Server and exposes Angus's capabilities as tools
+   - **Docker Configuration (Dockerfile.coral)**: Container definition for the Angus Coral Agent
+   - **Test and Deployment Scripts**: Scripts for testing and deploying the Coral Protocol integration
+9. **Test Scripts**: Various scripts to test different aspects of the system.
 
 ## Component Documentation
 
@@ -1099,7 +1103,288 @@ comment on table influence_music is 'Stores music analysis results for influence
 | `analysis`     | `jsonb`     | JSON data with OpenAI analysis results      |
 | `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
 
+### 8. Angus Coral Agent (angus_coral_agent.py)
+
+The `AngusCoral` class provides integration between Angus and the Coral Protocol, allowing Angus to participate in a multi-agent ecosystem.
+
+#### Class: `AngusCoral`
+
+##### Constructor
+
+```python
+def __init__(self, coral_server_url="https://coral.pushcollective.club/sse")
+```
+
+**Description**: Initializes the Angus Coral Agent with the provided Coral server URL.
+
+**Parameters**:
+- `coral_server_url` (str, optional): URL of the Coral Protocol Server. Defaults to "https://coral.pushcollective.club/sse".
+
+**Returns**: None
+
+**Example**:
+```python
+# Using default Coral server URL
+agent = AngusCoral()
+
+# Using custom Coral server URL
+agent = AngusCoral(coral_server_url="https://your-coral-server.com/sse")
+```
+
+##### Method: `register_agent`
+
+```python
+def register_agent(self) -> bool
+```
+
+**Description**: Registers the agent with the Coral Protocol Server.
+
+**Parameters**: None
+
+**Returns**:
+- `bool`: True if registration was successful, False otherwise
+
+**Example**:
+```python
+success = agent.register_agent()
+if success:
+    print("Successfully registered with Coral server")
+else:
+    print("Failed to register with Coral server")
+```
+
+**Error Handling**:
+- Logs detailed error information if registration fails
+- Returns False if an error occurs during registration
+
+##### Method: `listen_for_messages`
+
+```python
+def listen_for_messages(self)
+```
+
+**Description**: Listens for messages from other agents in the Coral Protocol ecosystem.
+
+**Parameters**: None
+
+**Returns**: None
+
+**Example**:
+```python
+# This will run indefinitely until interrupted
+agent.listen_for_messages()
+```
+
+**Error Handling**:
+- Polls for new messages at regular intervals
+- Catches and logs errors during message processing
+- Waits longer after an error before retrying
+
+##### Method: `process_message`
+
+```python
+def process_message(self, message: Dict[str, Any])
+```
+
+**Description**: Processes a message from another agent.
+
+**Parameters**:
+- `message` (Dict[str, Any]): Message data from the Coral server
+
+**Returns**: None
+
+**Example**:
+```python
+agent.process_message({
+    "threadId": "thread-id",
+    "senderId": "sender-agent-id",
+    "content": {
+        "tool": "upload_video",
+        "parameters": {
+            "video_url": "https://example.com/video.mp4",
+            "title": "Test Video"
+        }
+    }
+})
+```
+
+**Error Handling**:
+- Checks if the requested tool exists
+- Catches and logs errors during tool execution
+- Sends error messages back to the sender
+
+##### Method: `send_message`
+
+```python
+def send_message(self, thread_id: str, recipient_id: str, content: Dict[str, Any]) -> bool
+```
+
+**Description**: Sends a message to another agent.
+
+**Parameters**:
+- `thread_id` (str): ID of the thread
+- `recipient_id` (str): ID of the recipient agent
+- `content` (Dict[str, Any]): Message content
+
+**Returns**:
+- `bool`: True if the message was sent successfully, False otherwise
+
+**Example**:
+```python
+success = agent.send_message(
+    thread_id="thread-id",
+    recipient_id="recipient-agent-id",
+    content={
+        "result": {
+            "youtube_id": "dQw4w9WgXcQ",
+            "message": "Video uploaded successfully"
+        },
+        "status": "success"
+    }
+)
+if success:
+    print("Message sent successfully")
+else:
+    print("Failed to send message")
+```
+
+**Error Handling**:
+- Logs detailed error information if sending fails
+- Returns False if an error occurs during sending
+
+##### Method: `upload_video`
+
+```python
+def upload_video(self, params: Dict[str, Any]) -> Dict[str, Any]
+```
+
+**Description**: Uploads a video to YouTube using Angus's YouTube client.
+
+**Parameters**:
+- `params` (Dict[str, Any]): Tool parameters including video_url, title, description, and tags
+
+**Returns**:
+- `Dict[str, Any]`: Result of the upload operation
+
+**Example**:
+```python
+result = agent.upload_video({
+    "video_url": "https://example.com/video.mp4",
+    "title": "Test Video",
+    "description": "This is a test video",
+    "tags": ["test", "video"]
+})
+print(f"Upload result: {result}")
+```
+
+**Error Handling**:
+- Handles expired URLs by returning a special status
+- Logs detailed information about the upload process
+- Returns a structured result with success/failure status
+
+##### Method: `fetch_comments`
+
+```python
+def fetch_comments(self, params: Dict[str, Any]) -> Dict[str, Any]
+```
+
+**Description**: Fetches comments for a YouTube video using Angus's YouTube client.
+
+**Parameters**:
+- `params` (Dict[str, Any]): Tool parameters including youtube_id and max_results
+
+**Returns**:
+- `Dict[str, Any]`: Result of the comment fetching operation
+
+**Example**:
+```python
+result = agent.fetch_comments({
+    "youtube_id": "dQw4w9WgXcQ",
+    "max_results": 10
+})
+print(f"Found {result['count']} comments")
+```
+
+**Error Handling**:
+- Logs detailed information about the comment fetching process
+- Returns a structured result with the comments and count
+
+##### Method: `analyze_music`
+
+```python
+def analyze_music(self, params: Dict[str, Any]) -> Dict[str, Any]
+```
+
+**Description**: Analyzes music using Angus's music analysis capabilities.
+
+**Parameters**:
+- `params` (Dict[str, Any]): Tool parameters including audio_url and analysis_type
+
+**Returns**:
+- `Dict[str, Any]`: Result of the music analysis operation
+
+**Example**:
+```python
+result = agent.analyze_music({
+    "audio_url": "https://example.com/audio.mp3",
+    "analysis_type": "detailed"
+})
+print(f"Analysis result: {result}")
+```
+
+**Error Handling**:
+- Logs detailed information about the music analysis process
+- Returns a structured result with the analysis data
+
+##### Method: `run`
+
+```python
+def run(self)
+```
+
+**Description**: Runs the Angus Coral Agent by registering with the Coral server and listening for messages.
+
+**Parameters**: None
+
+**Returns**: None
+
+**Example**:
+```python
+# This will run indefinitely until interrupted
+agent.run()
+```
+
+**Error Handling**:
+- Checks if registration was successful before listening for messages
+- Logs detailed error information if registration fails
+
+#### Function: `main`
+
+```python
+def main()
+```
+
+**Description**: Main entry point for the Angus Coral Agent.
+
+**Parameters**: None
+
+**Returns**: None
+
+**Example**:
+```python
+# Called when the script is run directly
+if __name__ == "__main__":
+    main()
+```
+
+**Environment Variables**:
+- `CORAL_SERVER_URL`: URL of the Coral Protocol Server (defaults to "https://coral.pushcollective.club/sse")
+- `OPENAI_API_KEY`: OpenAI API key for LangChain functionality
+
 ## Test Scripts
 
 ### test_angus.py
 Unit tests for Agent Angus using mocks to avoid making actual API calls.
+
+### test_angus_coral.py
+Tests for the Angus Coral Agent integration, verifying connection to the Coral Protocol Server and agent registration.

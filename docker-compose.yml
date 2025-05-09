@@ -28,3 +28,22 @@ services:
       - .env
     ports:
       - "8080:5000"
+      
+  angus_coral:
+    build:
+      context: .
+      dockerfile: Dockerfile.coral
+    restart: always
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - CORAL_SERVER_URL=https://coral.pushcollective.club/sse
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - angus
