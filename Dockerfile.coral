@@ -16,10 +16,10 @@ ARG CACHEBUST=1
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.coral.txt
 RUN pip install --no-cache-dir supabase==2.15.1
-RUN pip install --no-cache-dir langchain-mcp-adapters==0.0.11 langchain-openai
+RUN pip install --no-cache-dir requests sseclient-py
 
 # Set environment variables
-ENV CORAL_SERVER_URL=https://coral.pushcollective.club/sse
+ENV CORAL_SERVER_URL=https://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse
 
 # Run the Coral agent
 CMD ["python", "angus_coral_agent.py"]
