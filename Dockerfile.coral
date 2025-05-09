@@ -21,7 +21,7 @@ ARG CACHEBUST=1
 RUN pip install --no-cache-dir -r requirements.coral.txt
 RUN pip install --no-cache-dir supabase==2.15.1
 RUN pip install --no-cache-dir requests sseclient-py
-RUN pip install --no-cache-dir openai langchain langchain-openai cryptography
+RUN pip install --no-cache-dir openai langchain langchain-openai langchain-community cryptography
 
 # Set environment variables
 ENV CORAL_SERVER_URL=http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse

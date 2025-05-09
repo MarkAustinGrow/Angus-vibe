@@ -8,8 +8,8 @@ import logging
 from typing import Dict, Any, List, Optional
 
 from openai import OpenAI
-from langchain.llms import OpenAI as LangChainOpenAI
-from langchain.chat_models import ChatOpenAI
+from langchain_community.llms import OpenAI as LangChainOpenAI
+from langchain_openai.chat_models import ChatOpenAI
 
 from angus_agent import AngusAgent
 from src.coral_protocol.langchain import CoralRunnableConfig, CoralRunnable
