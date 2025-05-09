@@ -7,7 +7,11 @@ COPY requirements.coral.txt .
 COPY config.py .
 COPY supabase_client.py .
 COPY youtube_client.py .
+COPY angus_agent.py .
+COPY angus_coral_adapter.py .
 COPY angus_coral_agent.py .
+COPY test_angus_coral.py .
+COPY src /app/src
 COPY data /app/data
 
 # Add a build argument to force cache invalidation
@@ -17,9 +21,10 @@ ARG CACHEBUST=1
 RUN pip install --no-cache-dir -r requirements.coral.txt
 RUN pip install --no-cache-dir supabase==2.15.1
 RUN pip install --no-cache-dir requests sseclient-py
+RUN pip install --no-cache-dir openai langchain langchain-openai cryptography
 
 # Set environment variables
-ENV CORAL_SERVER_URL=https://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse
+ENV CORAL_SERVER_URL=http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse
 
 # Run the Coral agent
 CMD ["python", "angus_coral_agent.py"]
