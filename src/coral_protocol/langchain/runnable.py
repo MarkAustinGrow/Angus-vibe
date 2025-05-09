@@ -55,9 +55,19 @@ class CoralRunnable(Generic[T]):
             True if registration was successful, False otherwise
         """
         try:
-            # Extract the base URL (without the /sse part)
-            base_url = self.config.server_url.rsplit('/sse', 1)[0]
+            # Parse the server URL to extract components
+            from urllib.parse import urlparse, urljoin
+            
+            # Print the server URL for debugging
+            print(f"DEBUG: Server URL in runnable.py: {self.config.server_url}")
+            
+            # Extract the base URL (preserving the full path structure)
+            parsed_url = urlparse(self.config.server_url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
             registration_url = f"{base_url}/register"
+            
+            # Print the registration URL for debugging
+            print(f"DEBUG: Registration URL: {registration_url}")
             
             # Prepare the registration data
             registration_data = {
@@ -319,9 +329,16 @@ class CoralRunnable(Generic[T]):
             True if the message was sent successfully, False otherwise
         """
         try:
-            # Extract the base URL (without the /sse part)
-            base_url = self.config.server_url.rsplit('/sse', 1)[0]
+            # Parse the server URL to extract components
+            from urllib.parse import urlparse, urljoin
+            
+            # Extract the base URL (preserving the full path structure)
+            parsed_url = urlparse(self.config.server_url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
             send_message_url = f"{base_url}/send_message"
+            
+            # Print the send message URL for debugging
+            print(f"DEBUG: Send message URL: {send_message_url}")
             
             # Prepare the message data
             message_data = {
@@ -360,9 +377,16 @@ class CoralRunnable(Generic[T]):
             Thread ID if successful, None otherwise
         """
         try:
-            # Extract the base URL (without the /sse part)
-            base_url = self.config.server_url.rsplit('/sse', 1)[0]
+            # Parse the server URL to extract components
+            from urllib.parse import urlparse, urljoin
+            
+            # Extract the base URL (preserving the full path structure)
+            parsed_url = urlparse(self.config.server_url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
             create_thread_url = f"{base_url}/create_thread"
+            
+            # Print the create thread URL for debugging
+            print(f"DEBUG: Create thread URL: {create_thread_url}")
             
             # Send the create thread request
             logger.info(f"Creating thread on Coral Protocol server: {create_thread_url}")
@@ -396,9 +420,16 @@ class CoralRunnable(Generic[T]):
             List of agents
         """
         try:
-            # Extract the base URL (without the /sse part)
-            base_url = self.config.server_url.rsplit('/sse', 1)[0]
+            # Parse the server URL to extract components
+            from urllib.parse import urlparse, urljoin
+            
+            # Extract the base URL (preserving the full path structure)
+            parsed_url = urlparse(self.config.server_url)
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
             list_agents_url = f"{base_url}/list_agents"
+            
+            # Print the list agents URL for debugging
+            print(f"DEBUG: List agents URL: {list_agents_url}")
             
             # Send the list agents request
             logger.info(f"Listing agents from Coral Protocol server: {list_agents_url}")

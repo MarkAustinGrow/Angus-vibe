@@ -230,6 +230,7 @@ def main():
         
         # Initialize Coral adapter
         logger.info(f"Initializing Coral adapter with server URL: {args.server_url}")
+        print(f"DEBUG: Using Coral server URL: {args.server_url}")
         coral_adapter = AngusCoralAdapter(
             angus_agent=angus_agent,
             coral_server_url=args.server_url,
