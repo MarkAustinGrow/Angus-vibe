@@ -11,14 +11,7 @@ import json
 import time
 import logging
 from typing import Dict, Any, List, Optional
-
-# Import LangChain components
-from langchain_mcp_adapters import CoralAgentRunnable
-from langchain.schema.runnable import Runnable
-from langchain.schema.runnable.config import RunnableConfig
-
-# Import Angus components
-from supabase_client import SupabaseClient
+import traceback
 
 # Configure logging
 logging.basicConfig(
@@ -31,230 +24,277 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Tool definitions
-upload_video_tool = {
-    "name": "upload_video",
-    "description": "Upload a video to YouTube",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "video_url": {
-                "type": "string",
-                "description": "URL of the video file to upload"
-            },
-            "title": {
-                "type": "string",
-                "description": "Title of the video"
-            },
-            "description": {
-                "type": "string",
-                "description": "Description of the video"
-            },
-            "tags": {
-                "type": "array",
-                "items": {
-                    "type": "string"
-                },
-                "description": "Tags for the video"
-            }
-        },
-        "required": ["video_url", "title"]
-    }
-}
+# Import Angus components
+from supabase_client import SupabaseClient
 
-fetch_comments_tool = {
-    "name": "fetch_comments",
-    "description": "Fetch comments for a YouTube video",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "youtube_id": {
-                "type": "string",
-                "description": "YouTube video ID"
-            },
-            "max_results": {
-                "type": "integer",
-                "description": "Maximum number of comments to retrieve"
-            }
-        },
-        "required": ["youtube_id"]
-    }
-}
+# Import LangChain components
+try:
+    from langchain.agents import Tool
+    from langchain.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+    from langchain.schema.runnable import RunnablePassthrough
+    from langchain.schema.output_parser import StrOutputParser
+    import langchain_mcp_adapters
+    
+    logger.info("Successfully imported LangChain components")
+except Exception as e:
+    logger.error(f"Error importing LangChain components: {str(e)}")
+    traceback.print_exc()
+    sys.exit(1)
 
-analyze_music_tool = {
-    "name": "analyze_music",
-    "description": "Analyze music and generate a description",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "audio_url": {
-                "type": "string",
-                "description": "URL of the audio file to analyze"
-            },
-            "analysis_type": {
-                "type": "string",
-                "enum": ["basic", "detailed"],
-                "description": "Type of analysis to perform"
-            }
-        },
-        "required": ["audio_url"]
-    }
-}
-
-class AngusCoralLangChain:
+class AngusCoralAgent:
     """
-    Angus Coral Agent using LangChain - Exposes Angus capabilities to the Coral Protocol
+    Angus Coral Agent - Exposes Angus capabilities to the Coral Protocol
     """
     
     def __init__(self, coral_server_url="https://coral.pushcollective.club/sse"):
         """
-        Initialize the Angus Coral Agent with LangChain.
+        Initialize the Angus Coral Agent.
         
         Args:
             coral_server_url: URL of the Coral Protocol Server
         """
-        # Initialize Angus components
-        self.supabase = SupabaseClient()
-        
-        # Agent details
+        self.coral_server_url = coral_server_url
         self.agent_id = "angus_agent"
-        self.agent_description = "Angus is a YouTube publishing and feedback collection agent that can upload videos, retrieve comments, and analyze music."
+        self.agent_description = """
+        You are angus_agent, responsible for YouTube publishing and feedback collection.
+        You can upload videos to YouTube, retrieve comments, and analyze music.
+        """
+        
+        # Initialize Angus components
+        try:
+            self.supabase = SupabaseClient()
+            logger.info("Successfully initialized SupabaseClient")
+        except Exception as e:
+            logger.error(f"Error initializing SupabaseClient: {str(e)}")
+            self.supabase = None
         
         # Define tools
-        self.tools = [
-            upload_video_tool,
-            fetch_comments_tool,
-            analyze_music_tool
+        self.tools = self._create_tools()
+        
+        # Initialize LLM
+        self.llm = ChatOpenAI(temperature=0)
+        
+        logger.info("Angus Coral Agent initialized")
+    
+    def _create_tools(self) -> List[Tool]:
+        """
+        Create tools for the agent.
+        
+        Returns:
+            List of tools
+        """
+        tools = [
+            Tool(
+                name="upload_video",
+                func=self.upload_video,
+                description="Upload a video to YouTube. Args: video_url (str), title (str), description (str, optional), tags (List[str], optional)"
+            ),
+            Tool(
+                name="fetch_comments",
+                func=self.fetch_comments,
+                description="Fetch comments for a YouTube video. Args: youtube_id (str), max_results (int, optional)"
+            ),
+            Tool(
+                name="analyze_music",
+                func=self.analyze_music,
+                description="Analyze music and generate a description. Args: audio_url (str), analysis_type (str, optional: 'basic' or 'detailed')"
+            )
         ]
         
-        # Create the LangChain Coral Agent Runnable
-        self.agent_runnable = CoralAgentRunnable(
-            agent_id=self.agent_id,
-            agent_description=self.agent_description,
-            tools=self.tools,
-            coral_server_url=coral_server_url,
-            tool_handlers={
-                "upload_video": self.upload_video,
-                "fetch_comments": self.fetch_comments,
-                "analyze_music": self.analyze_music
-            }
-        )
-        
-        logger.info("Angus Coral Agent with LangChain initialized")
+        return tools
     
-    # Tool implementations
-    def upload_video(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def upload_video(self, args_str: str) -> str:
         """
         Upload a video to YouTube.
         
         Args:
-            params: Tool parameters
+            args_str: JSON string with arguments
             
         Returns:
-            Result of the upload operation
+            Result of the upload operation as a string
         """
-        title = params.get("title")
-        video_url = params.get("video_url")
-        description = params.get("description", "")
-        tags = params.get("tags", [])
-        
-        logger.info(f"Uploading video: {title} from {video_url}")
-        
-        # For now, we'll return a placeholder since we're not using YouTubeClient
-        logger.info(f"Simulating upload of video: {title}")
-        
-        return {
-            "success": True,
-            "youtube_id": "simulated_youtube_id",
-            "message": f"Video '{title}' upload simulated successfully"
-        }
+        try:
+            args = json.loads(args_str) if isinstance(args_str, str) else args_str
+            video_url = args.get("video_url")
+            title = args.get("title")
+            description = args.get("description", "")
+            tags = args.get("tags", [])
+            
+            if not video_url or not title:
+                return json.dumps({"error": "Missing required parameters: video_url and title"})
+            
+            logger.info(f"Uploading video: {title} from {video_url}")
+            
+            # For now, we'll return a placeholder since we're not using YouTubeClient
+            logger.info(f"Simulating upload of video: {title}")
+            
+            return json.dumps({
+                "success": True,
+                "youtube_id": "simulated_youtube_id",
+                "message": f"Video '{title}' upload simulated successfully"
+            })
+        except Exception as e:
+            logger.error(f"Error uploading video: {str(e)}")
+            return json.dumps({"error": f"Error uploading video: {str(e)}"})
     
-    def fetch_comments(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def fetch_comments(self, args_str: str) -> str:
         """
         Fetch comments for a YouTube video.
         
         Args:
-            params: Tool parameters
+            args_str: JSON string with arguments
             
         Returns:
-            Comments for the video
+            Comments for the video as a string
         """
-        youtube_id = params.get("youtube_id")
-        max_results = params.get("max_results", 100)
-        
-        logger.info(f"Fetching comments for video: {youtube_id} (max: {max_results})")
-        
-        # For now, we'll return a placeholder since we're not using YouTubeClient
-        logger.info(f"Simulating fetching comments for video: {youtube_id}")
-        
-        return {
-            "success": True,
-            "comments": [
-                {
-                    "id": "comment1",
-                    "author": "User1",
-                    "content": "Great video!",
-                    "timestamp": "2023-01-01T12:00:00Z"
-                },
-                {
-                    "id": "comment2",
-                    "author": "User2",
-                    "content": "I enjoyed this content.",
-                    "timestamp": "2023-01-02T12:00:00Z"
-                }
-            ],
-            "count": 2
-        }
+        try:
+            args = json.loads(args_str) if isinstance(args_str, str) else args_str
+            youtube_id = args.get("youtube_id")
+            max_results = args.get("max_results", 100)
+            
+            if not youtube_id:
+                return json.dumps({"error": "Missing required parameter: youtube_id"})
+            
+            logger.info(f"Fetching comments for video: {youtube_id} (max: {max_results})")
+            
+            # For now, we'll return a placeholder since we're not using YouTubeClient
+            logger.info(f"Simulating fetching comments for video: {youtube_id}")
+            
+            return json.dumps({
+                "success": True,
+                "comments": [
+                    {
+                        "id": "comment1",
+                        "author": "User1",
+                        "content": "Great video!",
+                        "timestamp": "2023-01-01T12:00:00Z"
+                    },
+                    {
+                        "id": "comment2",
+                        "author": "User2",
+                        "content": "I enjoyed this content.",
+                        "timestamp": "2023-01-02T12:00:00Z"
+                    }
+                ],
+                "count": 2
+            })
+        except Exception as e:
+            logger.error(f"Error fetching comments: {str(e)}")
+            return json.dumps({"error": f"Error fetching comments: {str(e)}"})
     
-    def analyze_music(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_music(self, args_str: str) -> str:
         """
         Analyze music and generate a description.
         
         Args:
-            params: Tool parameters
+            args_str: JSON string with arguments
             
         Returns:
-            Analysis results
+            Analysis results as a string
         """
-        audio_url = params.get("audio_url")
-        analysis_type = params.get("analysis_type", "basic")
+        try:
+            args = json.loads(args_str) if isinstance(args_str, str) else args_str
+            audio_url = args.get("audio_url")
+            analysis_type = args.get("analysis_type", "basic")
+            
+            if not audio_url:
+                return json.dumps({"error": "Missing required parameter: audio_url"})
+            
+            logger.info(f"Analyzing music: {audio_url} (type: {analysis_type})")
+            
+            # This would integrate with Angus's music analysis capabilities
+            # For now, we'll return a placeholder
+            
+            logger.info(f"Completed music analysis for: {audio_url}")
+            
+            return json.dumps({
+                "success": True,
+                "analysis": "Music analysis would be performed here",
+                "details": {
+                    "audio_url": audio_url,
+                    "analysis_type": analysis_type
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error analyzing music: {str(e)}")
+            return json.dumps({"error": f"Error analyzing music: {str(e)}"})
+    
+    def _create_agent_chain(self):
+        """
+        Create the agent chain.
         
-        logger.info(f"Analyzing music: {audio_url} (type: {analysis_type})")
+        Returns:
+            Agent chain
+        """
+        # Define the prompt template
+        prompt = PromptTemplate.from_template(
+            """
+            You are the Angus agent, specialized in YouTube operations and music analysis.
+            
+            User request: {input}
+            
+            Think through how to handle this request using your available tools.
+            """
+        )
         
-        # This would integrate with Angus's music analysis capabilities
-        # For now, we'll return a placeholder
+        # Create the chain
+        chain = (
+            {"input": RunnablePassthrough()}
+            | prompt
+            | self.llm
+            | StrOutputParser()
+        )
         
-        logger.info(f"Completed music analysis for: {audio_url}")
-        
-        return {
-            "success": True,
-            "analysis": "Music analysis would be performed here",
-            "details": params
-        }
+        return chain
     
     def run(self):
         """
-        Run the Angus Coral agent with LangChain.
+        Run the Angus Coral agent.
         
-        This method starts the LangChain Coral Agent Runnable.
+        This method starts the agent and connects it to the Coral Protocol server.
         """
-        logger.info("Starting Angus Coral Agent with LangChain")
+        logger.info(f"Starting Angus Coral Agent with server URL: {self.coral_server_url}")
         
         try:
-            # Run the agent runnable
-            self.agent_runnable.run({})
+            # Create the agent chain
+            chain = self._create_agent_chain()
+            
+            # Connect to the Coral Protocol server
+            from langchain_mcp_adapters import register_agent
+            
+            # Register the agent with the Coral Protocol server
+            register_agent(
+                agent_id=self.agent_id,
+                agent_description=self.agent_description,
+                tools=self.tools,
+                llm_chain=chain,
+                base_url=self.coral_server_url,
+                wait_for_agents=2  # Wait for 2 agents to be available
+            )
+            
+            logger.info("Agent registered with Coral Protocol server")
+            
+            # Keep the process running
+            while True:
+                time.sleep(10)
+                logger.info("Angus Coral Agent is running...")
+                
+        except KeyboardInterrupt:
+            logger.info("Angus Coral Agent stopped by user")
         except Exception as e:
-            logger.error(f"Error running Angus Coral Agent with LangChain: {str(e)}")
+            logger.error(f"Error running Angus Coral Agent: {str(e)}")
+            traceback.print_exc()
 
 def main():
     """
-    Main entry point for the Angus Coral Agent with LangChain.
+    Main entry point for the Angus Coral Agent.
     """
     # Get Coral server URL from environment variable or use default
     coral_server_url = os.environ.get("CORAL_SERVER_URL", "https://coral.pushcollective.club/sse")
     
     # Create and run the agent
-    agent = AngusCoralLangChain(coral_server_url=coral_server_url)
+    agent = AngusCoralAgent(coral_server_url=coral_server_url)
     agent.run()
 
 if __name__ == "__main__":

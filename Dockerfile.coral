@@ -16,7 +16,7 @@ ARG CACHEBUST=1
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.coral.txt
 RUN pip install --no-cache-dir supabase==2.15.1
-RUN pip install --no-cache-dir langchain-mcp-adapters jupyter
+RUN pip install --no-cache-dir langchain-mcp-adapters langchain-openai jupyter
 
 # Set environment variables
 ENV CORAL_SERVER_URL=https://coral.pushcollective.club/sse
