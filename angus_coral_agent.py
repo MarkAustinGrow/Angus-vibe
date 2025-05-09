@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-Angus Coral Agent - Integration between Angus and Coral Protocol using LangChain
+Angus Coral Agent - Integration between Angus and Coral Protocol
 
 This script implements a Coral Protocol agent that exposes Angus's capabilities
-to other agents in the Coral ecosystem using LangChain MCP adapters.
+to other agents in the Coral ecosystem using direct HTTP/SSE communication.
 """
 import os
 import sys
 import json
 import time
 import logging
-from typing import Dict, Any, List, Optional
 import traceback
+import requests
+import sseclient
+import threading
+from typing import Dict, Any, List, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -25,23 +28,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import Angus components
-from supabase_client import SupabaseClient
-
-# Import LangChain components
 try:
-    from langchain.agents import Tool
-    from langchain.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
-    from langchain.schema.runnable import RunnablePassthrough
-    from langchain.schema.output_parser import StrOutputParser
-    import langchain_mcp_adapters
-    
-    logger.info("Successfully imported LangChain components")
-    logger.info(f"Available in langchain_mcp_adapters: {dir(langchain_mcp_adapters)}")
+    from supabase_client import SupabaseClient
+    logger.info("Successfully imported SupabaseClient")
 except Exception as e:
-    logger.error(f"Error importing LangChain components: {str(e)}")
-    traceback.print_exc()
-    sys.exit(1)
+    logger.error(f"Error importing SupabaseClient: {str(e)}")
+    SupabaseClient = None
 
 class AngusCoralAgent:
     """
@@ -64,75 +56,89 @@ class AngusCoralAgent:
         
         # Initialize Angus components
         try:
-            self.supabase = SupabaseClient()
-            logger.info("Successfully initialized SupabaseClient")
+            if SupabaseClient:
+                self.supabase = SupabaseClient()
+                logger.info("Successfully initialized SupabaseClient")
+            else:
+                self.supabase = None
+                logger.warning("SupabaseClient not available")
         except Exception as e:
             logger.error(f"Error initializing SupabaseClient: {str(e)}")
             self.supabase = None
         
-        # Initialize LLM
-        self.llm = ChatOpenAI(temperature=0)
+        # Agent state
+        self.agent_did = None  # Will be set after registration
+        self.threads = {}  # Thread ID -> Thread data
+        self.mentions = []  # List of mentions
+        self.running = False
         
         logger.info("Angus Coral Agent initialized")
     
-    def upload_video(self, args_str: str) -> str:
+    def upload_video(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         Upload a video to YouTube.
         
         Args:
-            args_str: JSON string with arguments
+            args: Arguments for the upload
             
         Returns:
-            Result of the upload operation as a string
+            Result of the upload operation
         """
         try:
-            args = json.loads(args_str) if isinstance(args_str, str) else args_str
             video_url = args.get("video_url")
             title = args.get("title")
             description = args.get("description", "")
             tags = args.get("tags", [])
             
             if not video_url or not title:
-                return json.dumps({"error": "Missing required parameters: video_url and title"})
+                return {
+                    "success": False,
+                    "error": "Missing required parameters: video_url and title"
+                }
             
             logger.info(f"Uploading video: {title} from {video_url}")
             
             # For now, we'll return a placeholder since we're not using YouTubeClient
             logger.info(f"Simulating upload of video: {title}")
             
-            return json.dumps({
+            return {
                 "success": True,
                 "youtube_id": "simulated_youtube_id",
                 "message": f"Video '{title}' upload simulated successfully"
-            })
+            }
         except Exception as e:
             logger.error(f"Error uploading video: {str(e)}")
-            return json.dumps({"error": f"Error uploading video: {str(e)}"})
+            return {
+                "success": False,
+                "error": f"Error uploading video: {str(e)}"
+            }
     
-    def fetch_comments(self, args_str: str) -> str:
+    def fetch_comments(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         Fetch comments for a YouTube video.
         
         Args:
-            args_str: JSON string with arguments
+            args: Arguments for fetching comments
             
         Returns:
-            Comments for the video as a string
+            Comments for the video
         """
         try:
-            args = json.loads(args_str) if isinstance(args_str, str) else args_str
             youtube_id = args.get("youtube_id")
             max_results = args.get("max_results", 100)
             
             if not youtube_id:
-                return json.dumps({"error": "Missing required parameter: youtube_id"})
+                return {
+                    "success": False,
+                    "error": "Missing required parameter: youtube_id"
+                }
             
             logger.info(f"Fetching comments for video: {youtube_id} (max: {max_results})")
             
             # For now, we'll return a placeholder since we're not using YouTubeClient
             logger.info(f"Simulating fetching comments for video: {youtube_id}")
             
-            return json.dumps({
+            return {
                 "success": True,
                 "comments": [
                     {
@@ -149,28 +155,33 @@ class AngusCoralAgent:
                     }
                 ],
                 "count": 2
-            })
+            }
         except Exception as e:
             logger.error(f"Error fetching comments: {str(e)}")
-            return json.dumps({"error": f"Error fetching comments: {str(e)}"})
+            return {
+                "success": False,
+                "error": f"Error fetching comments: {str(e)}"
+            }
     
-    def analyze_music(self, args_str: str) -> str:
+    def analyze_music(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         Analyze music and generate a description.
         
         Args:
-            args_str: JSON string with arguments
+            args: Arguments for music analysis
             
         Returns:
-            Analysis results as a string
+            Analysis results
         """
         try:
-            args = json.loads(args_str) if isinstance(args_str, str) else args_str
             audio_url = args.get("audio_url")
             analysis_type = args.get("analysis_type", "basic")
             
             if not audio_url:
-                return json.dumps({"error": "Missing required parameter: audio_url"})
+                return {
+                    "success": False,
+                    "error": "Missing required parameter: audio_url"
+                }
             
             logger.info(f"Analyzing music: {audio_url} (type: {analysis_type})")
             
@@ -179,29 +190,258 @@ class AngusCoralAgent:
             
             logger.info(f"Completed music analysis for: {audio_url}")
             
-            return json.dumps({
+            return {
                 "success": True,
                 "analysis": "Music analysis would be performed here",
                 "details": {
                     "audio_url": audio_url,
                     "analysis_type": analysis_type
                 }
-            })
+            }
         except Exception as e:
             logger.error(f"Error analyzing music: {str(e)}")
-            return json.dumps({"error": f"Error analyzing music: {str(e)}"})
+            return {
+                "success": False,
+                "error": f"Error analyzing music: {str(e)}"
+            }
     
-    def handle_mention(self, thread_id, sender_id, message):
+    def register_agent(self) -> bool:
         """
-        Handle a mention from another agent.
+        Register the agent with the Coral Protocol server.
+        
+        Returns:
+            True if registration was successful, False otherwise
+        """
+        try:
+            # Construct the registration URL
+            registration_url = f"{self.coral_server_url}/register"
+            
+            # Prepare the registration data
+            registration_data = {
+                "agentId": self.agent_id,
+                "agentDescription": self.agent_description,
+                "waitForAgents": 2  # Wait for 2 agents to be available
+            }
+            
+            # Send the registration request
+            logger.info(f"Registering agent with Coral Protocol server: {registration_url}")
+            response = requests.post(registration_url, json=registration_data)
+            
+            # Check if registration was successful
+            if response.status_code == 200:
+                registration_result = response.json()
+                self.agent_did = registration_result.get("agentDid")
+                logger.info(f"Agent registered successfully with DID: {self.agent_did}")
+                return True
+            else:
+                logger.error(f"Failed to register agent: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error registering agent: {str(e)}")
+            traceback.print_exc()
+            return False
+    
+    def list_agents(self) -> List[Dict[str, Any]]:
+        """
+        List all agents registered with the Coral Protocol server.
+        
+        Returns:
+            List of agents
+        """
+        try:
+            # Construct the list agents URL
+            list_agents_url = f"{self.coral_server_url}/list_agents"
+            
+            # Send the list agents request
+            logger.info(f"Listing agents from Coral Protocol server: {list_agents_url}")
+            response = requests.get(list_agents_url)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                agents = response.json()
+                logger.info(f"Found {len(agents)} agents")
+                return agents
+            else:
+                logger.error(f"Failed to list agents: {response.status_code} - {response.text}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error listing agents: {str(e)}")
+            traceback.print_exc()
+            return []
+    
+    def create_thread(self) -> Optional[str]:
+        """
+        Create a new thread on the Coral Protocol server.
+        
+        Returns:
+            Thread ID if successful, None otherwise
+        """
+        try:
+            # Construct the create thread URL
+            create_thread_url = f"{self.coral_server_url}/create_thread"
+            
+            # Send the create thread request
+            logger.info(f"Creating thread on Coral Protocol server: {create_thread_url}")
+            response = requests.post(create_thread_url)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                thread_data = response.json()
+                thread_id = thread_data.get("threadId")
+                self.threads[thread_id] = thread_data
+                logger.info(f"Thread created successfully: {thread_id}")
+                return thread_id
+            else:
+                logger.error(f"Failed to create thread: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating thread: {str(e)}")
+            traceback.print_exc()
+            return None
+    
+    def send_message(self, thread_id: str, message: str, mentions: List[str]) -> bool:
+        """
+        Send a message to a thread on the Coral Protocol server.
+        
+        Args:
+            thread_id: ID of the thread
+            message: Message content
+            mentions: List of agent IDs to mention
+            
+        Returns:
+            True if the message was sent successfully, False otherwise
+        """
+        try:
+            # Construct the send message URL
+            send_message_url = f"{self.coral_server_url}/send_message"
+            
+            # Prepare the message data
+            message_data = {
+                "threadId": thread_id,
+                "message": message,
+                "mentions": mentions
+            }
+            
+            # Send the message request
+            logger.info(f"Sending message to thread {thread_id} with mentions {mentions}")
+            response = requests.post(send_message_url, json=message_data)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                logger.info(f"Message sent successfully to thread {thread_id}")
+                return True
+            else:
+                logger.error(f"Failed to send message: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error sending message: {str(e)}")
+            traceback.print_exc()
+            return False
+    
+    def start_sse_listener(self):
+        """
+        Start listening for SSE events from the Coral Protocol server.
+        """
+        try:
+            # Construct the SSE URL
+            sse_url = f"{self.coral_server_url}/events?agentId={self.agent_id}"
+            
+            # Start the SSE client
+            logger.info(f"Starting SSE listener: {sse_url}")
+            response = requests.get(sse_url, stream=True)
+            client = sseclient.SSEClient(response)
+            
+            # Process events
+            for event in client.events():
+                try:
+                    # Parse the event data
+                    event_data = json.loads(event.data)
+                    event_type = event_data.get("type")
+                    
+                    # Handle different event types
+                    if event_type == "mention":
+                        self.handle_mention(event_data)
+                    elif event_type == "thread_update":
+                        self.handle_thread_update(event_data)
+                    else:
+                        logger.info(f"Received unknown event type: {event_type}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing SSE event: {str(e)}")
+                    traceback.print_exc()
+                    
+                # Check if we should stop
+                if not self.running:
+                    break
+                    
+        except Exception as e:
+            logger.error(f"Error in SSE listener: {str(e)}")
+            traceback.print_exc()
+            
+            # Try to reconnect after a delay
+            if self.running:
+                time.sleep(5)
+                threading.Thread(target=self.start_sse_listener).start()
+    
+    def handle_mention(self, event_data: Dict[str, Any]):
+        """
+        Handle a mention event from the Coral Protocol server.
+        
+        Args:
+            event_data: Event data
+        """
+        try:
+            # Extract mention data
+            thread_id = event_data.get("threadId")
+            sender_id = event_data.get("senderId")
+            message = event_data.get("message")
+            
+            logger.info(f"Received mention in thread {thread_id} from {sender_id}: {message}")
+            
+            # Add to mentions list
+            self.mentions.append(event_data)
+            
+            # Process the mention
+            threading.Thread(target=self.process_mention, args=(thread_id, sender_id, message)).start()
+            
+        except Exception as e:
+            logger.error(f"Error handling mention: {str(e)}")
+            traceback.print_exc()
+    
+    def handle_thread_update(self, event_data: Dict[str, Any]):
+        """
+        Handle a thread update event from the Coral Protocol server.
+        
+        Args:
+            event_data: Event data
+        """
+        try:
+            # Extract thread data
+            thread_id = event_data.get("threadId")
+            thread_data = event_data.get("threadData")
+            
+            logger.info(f"Received thread update for thread {thread_id}")
+            
+            # Update thread data
+            self.threads[thread_id] = thread_data
+            
+        except Exception as e:
+            logger.error(f"Error handling thread update: {str(e)}")
+            traceback.print_exc()
+    
+    def process_mention(self, thread_id: str, sender_id: str, message: str):
+        """
+        Process a mention from another agent.
         
         Args:
             thread_id: ID of the thread
             sender_id: ID of the sender
             message: Message content
         """
-        logger.info(f"Received mention in thread {thread_id} from {sender_id}: {message}")
-        
         try:
             # Take time to interpret the instruction
             time.sleep(2)
@@ -231,21 +471,22 @@ class AngusCoralAgent:
                 }
                 response = self.analyze_music(args)
             else:
-                response = json.dumps({
+                response = {
+                    "success": False,
                     "error": f"I don't understand how to handle: {instruction}"
-                })
+                }
             
             # Take time to formulate a response
             time.sleep(3)
             
             # Send the response
-            from langchain_mcp_adapters import send_message
-            send_message(thread_id, response, [sender_id])
+            response_message = json.dumps(response, indent=2)
+            self.send_message(thread_id, response_message, [sender_id])
             
             logger.info(f"Sent response in thread {thread_id} to {sender_id}")
             
         except Exception as e:
-            logger.error(f"Error handling mention: {str(e)}")
+            logger.error(f"Error processing mention: {str(e)}")
             traceback.print_exc()
     
     def run(self):
@@ -257,48 +498,42 @@ class AngusCoralAgent:
         logger.info(f"Starting Angus Coral Agent with server URL: {self.coral_server_url}")
         
         try:
-            # Import Coral Protocol tools
-            from langchain_mcp_adapters import list_agents, wait_for_mentions, create_thread, send_message
+            # Set running flag
+            self.running = True
             
-            # Configure the base URL
-            langchain_mcp_adapters.base_url = self.coral_server_url
+            # Register the agent
+            if not self.register_agent():
+                logger.error("Failed to register agent, exiting")
+                return
             
-            # Set up agent parameters
-            langchain_mcp_adapters.agent_id = self.agent_id
-            langchain_mcp_adapters.agent_description = self.agent_description
-            langchain_mcp_adapters.wait_for_agents = 2  # Wait for 2 agents to be available
-            
-            logger.info("Agent configured with Coral Protocol server")
+            # Start the SSE listener
+            threading.Thread(target=self.start_sse_listener).start()
             
             # Main loop
-            while True:
+            while self.running:
                 try:
-                    # Wait for mentions
-                    logger.info("Waiting for mentions...")
-                    mentions = wait_for_mentions(timeout=8)
+                    # Log status periodically
+                    logger.info(f"Angus Coral Agent is running... (DID: {self.agent_did})")
+                    logger.info(f"Threads: {len(self.threads)}, Mentions: {len(self.mentions)}")
                     
-                    if mentions:
-                        for mention in mentions:
-                            thread_id = mention.get("threadId")
-                            sender_id = mention.get("senderId")
-                            message = mention.get("message")
-                            
-                            # Handle the mention
-                            self.handle_mention(thread_id, sender_id, message)
+                    # Sleep for a while
+                    time.sleep(60)
                     
-                    # Wait before checking for mentions again
-                    time.sleep(2)
-                    
+                except KeyboardInterrupt:
+                    logger.info("Keyboard interrupt received, stopping")
+                    self.running = False
                 except Exception as e:
                     logger.error(f"Error in main loop: {str(e)}")
                     traceback.print_exc()
-                    time.sleep(5)  # Wait before retrying
+                    time.sleep(5)
                 
         except KeyboardInterrupt:
             logger.info("Angus Coral Agent stopped by user")
+            self.running = False
         except Exception as e:
             logger.error(f"Error running Angus Coral Agent: {str(e)}")
             traceback.print_exc()
+            self.running = False
 
 def main():
     """
