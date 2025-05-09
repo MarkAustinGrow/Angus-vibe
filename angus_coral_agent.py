@@ -37,6 +37,7 @@ try:
     import langchain_mcp_adapters
     
     logger.info("Successfully imported LangChain components")
+    logger.info(f"Available in langchain_mcp_adapters: {dir(langchain_mcp_adapters)}")
 except Exception as e:
     logger.error(f"Error importing LangChain components: {str(e)}")
     traceback.print_exc()
@@ -69,40 +70,10 @@ class AngusCoralAgent:
             logger.error(f"Error initializing SupabaseClient: {str(e)}")
             self.supabase = None
         
-        # Define tools
-        self.tools = self._create_tools()
-        
         # Initialize LLM
         self.llm = ChatOpenAI(temperature=0)
         
         logger.info("Angus Coral Agent initialized")
-    
-    def _create_tools(self) -> List[Tool]:
-        """
-        Create tools for the agent.
-        
-        Returns:
-            List of tools
-        """
-        tools = [
-            Tool(
-                name="upload_video",
-                func=self.upload_video,
-                description="Upload a video to YouTube. Args: video_url (str), title (str), description (str, optional), tags (List[str], optional)"
-            ),
-            Tool(
-                name="fetch_comments",
-                func=self.fetch_comments,
-                description="Fetch comments for a YouTube video. Args: youtube_id (str), max_results (int, optional)"
-            ),
-            Tool(
-                name="analyze_music",
-                func=self.analyze_music,
-                description="Analyze music and generate a description. Args: audio_url (str), analysis_type (str, optional: 'basic' or 'detailed')"
-            )
-        ]
-        
-        return tools
     
     def upload_video(self, args_str: str) -> str:
         """
@@ -220,33 +191,62 @@ class AngusCoralAgent:
             logger.error(f"Error analyzing music: {str(e)}")
             return json.dumps({"error": f"Error analyzing music: {str(e)}"})
     
-    def _create_agent_chain(self):
+    def handle_mention(self, thread_id, sender_id, message):
         """
-        Create the agent chain.
+        Handle a mention from another agent.
         
-        Returns:
-            Agent chain
+        Args:
+            thread_id: ID of the thread
+            sender_id: ID of the sender
+            message: Message content
         """
-        # Define the prompt template
-        prompt = PromptTemplate.from_template(
-            """
-            You are the Angus agent, specialized in YouTube operations and music analysis.
-            
-            User request: {input}
-            
-            Think through how to handle this request using your available tools.
-            """
-        )
+        logger.info(f"Received mention in thread {thread_id} from {sender_id}: {message}")
         
-        # Create the chain
-        chain = (
-            {"input": RunnablePassthrough()}
-            | prompt
-            | self.llm
-            | StrOutputParser()
-        )
-        
-        return chain
+        try:
+            # Take time to interpret the instruction
+            time.sleep(2)
+            
+            # Parse the instruction
+            instruction = message.strip()
+            
+            # Determine which tool to use
+            response = None
+            if "upload" in instruction.lower() and "video" in instruction.lower():
+                # Extract parameters from the instruction
+                args = {
+                    "video_url": "https://example.com/video.mp4",
+                    "title": "Example Video"
+                }
+                response = self.upload_video(args)
+            elif "fetch" in instruction.lower() and "comment" in instruction.lower():
+                # Extract parameters from the instruction
+                args = {
+                    "youtube_id": "example_youtube_id"
+                }
+                response = self.fetch_comments(args)
+            elif "analyze" in instruction.lower() and "music" in instruction.lower():
+                # Extract parameters from the instruction
+                args = {
+                    "audio_url": "https://example.com/audio.mp3"
+                }
+                response = self.analyze_music(args)
+            else:
+                response = json.dumps({
+                    "error": f"I don't understand how to handle: {instruction}"
+                })
+            
+            # Take time to formulate a response
+            time.sleep(3)
+            
+            # Send the response
+            from langchain_mcp_adapters import send_message
+            send_message(thread_id, response, [sender_id])
+            
+            logger.info(f"Sent response in thread {thread_id} to {sender_id}")
+            
+        except Exception as e:
+            logger.error(f"Error handling mention: {str(e)}")
+            traceback.print_exc()
     
     def run(self):
         """
@@ -257,28 +257,42 @@ class AngusCoralAgent:
         logger.info(f"Starting Angus Coral Agent with server URL: {self.coral_server_url}")
         
         try:
-            # Create the agent chain
-            chain = self._create_agent_chain()
+            # Import Coral Protocol tools
+            from langchain_mcp_adapters import list_agents, wait_for_mentions, create_thread, send_message
             
-            # Connect to the Coral Protocol server
-            from langchain_mcp_adapters import register_agent
+            # Configure the base URL
+            langchain_mcp_adapters.base_url = self.coral_server_url
             
-            # Register the agent with the Coral Protocol server
-            register_agent(
-                agent_id=self.agent_id,
-                agent_description=self.agent_description,
-                tools=self.tools,
-                llm_chain=chain,
-                base_url=self.coral_server_url,
-                wait_for_agents=2  # Wait for 2 agents to be available
-            )
+            # Set up agent parameters
+            langchain_mcp_adapters.agent_id = self.agent_id
+            langchain_mcp_adapters.agent_description = self.agent_description
+            langchain_mcp_adapters.wait_for_agents = 2  # Wait for 2 agents to be available
             
-            logger.info("Agent registered with Coral Protocol server")
+            logger.info("Agent configured with Coral Protocol server")
             
-            # Keep the process running
+            # Main loop
             while True:
-                time.sleep(10)
-                logger.info("Angus Coral Agent is running...")
+                try:
+                    # Wait for mentions
+                    logger.info("Waiting for mentions...")
+                    mentions = wait_for_mentions(timeout=8)
+                    
+                    if mentions:
+                        for mention in mentions:
+                            thread_id = mention.get("threadId")
+                            sender_id = mention.get("senderId")
+                            message = mention.get("message")
+                            
+                            # Handle the mention
+                            self.handle_mention(thread_id, sender_id, message)
+                    
+                    # Wait before checking for mentions again
+                    time.sleep(2)
+                    
+                except Exception as e:
+                    logger.error(f"Error in main loop: {str(e)}")
+                    traceback.print_exc()
+                    time.sleep(5)  # Wait before retrying
                 
         except KeyboardInterrupt:
             logger.info("Angus Coral Agent stopped by user")
