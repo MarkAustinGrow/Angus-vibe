@@ -44,6 +44,7 @@ class CoralRunnable(Generic[T]):
         self.mentions = []  # List of mentions
         self.running = False
         self.sse_thread = None
+        self.message_endpoint = None  # Endpoint for sending messages
         
         logger.info(f"Initialized Coral Runnable with {len(functions)} functions")
     
@@ -152,21 +153,48 @@ class CoralRunnable(Generic[T]):
             # Process events
             for event in client.events():
                 try:
+                    # Log the raw event for debugging
+                    logger.debug(f"Raw SSE event: {event}")
+                    logger.debug(f"Event data: '{event.data}'")
+                    logger.debug(f"Event type: '{event.event}'")
                     logger.info(f"Received SSE event: {event.event} - {event.data}")
                     
-                    # Parse the event data
-                    event_data = json.loads(event.data)
-                    event_type = event_data.get("type")
+                    # Handle 'endpoint' events specially
+                    if event.event == "endpoint":
+                        logger.info(f"Received endpoint event: {event.data}")
+                        # Store the endpoint for future use
+                        self.message_endpoint = event.data
+                        continue
                     
-                    # Handle different event types
-                    if event_type == "mention":
-                        self.handle_mention(event_data)
-                    elif event_type == "thread_update":
-                        self.handle_thread_update(event_data)
-                    elif event_type == "registration":
-                        self.handle_registration(event_data)
-                    else:
-                        logger.info(f"Received unknown event type: {event_type}")
+                    # Skip empty events
+                    if not event.data or event.data.isspace():
+                        logger.debug("Skipping empty event data")
+                        continue
+                    
+                    # Try to parse the JSON data
+                    try:
+                        event_data = json.loads(event.data)
+                        event_type = event_data.get("type")
+                        
+                        # Handle different event types
+                        if event_type == "mention":
+                            self.handle_mention(event_data)
+                        elif event_type == "thread_update":
+                            self.handle_thread_update(event_data)
+                        elif event_type == "registration":
+                            self.handle_registration(event_data)
+                        else:
+                            logger.info(f"Received unknown event type: {event_type}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse event data as JSON: {str(e)}")
+                        logger.warning(f"Raw data: '{event.data}'")
+                        # Try to handle non-JSON event data based on event type
+                        if event.event == "message":
+                            logger.info(f"Received message event with non-JSON data: {event.data}")
+                            # Handle message event with non-JSON data
+                        elif event.event == "registration":
+                            logger.info(f"Received registration event with non-JSON data: {event.data}")
+                            # Handle registration event with non-JSON data
                         
                 except Exception as e:
                     logger.error(f"Error processing SSE event: {str(e)}")
@@ -329,13 +357,29 @@ class CoralRunnable(Generic[T]):
             True if the message was sent successfully, False otherwise
         """
         try:
-            # Parse the server URL to extract components
-            from urllib.parse import urlparse, urljoin
-            
-            # Extract the base URL (preserving the full path structure)
-            parsed_url = urlparse(self.config.server_url)
-            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
-            send_message_url = f"{base_url}/send_message"
+            # Use the message endpoint if available
+            if self.message_endpoint:
+                # The message endpoint might be a relative URL
+                from urllib.parse import urlparse, urljoin
+                
+                # Check if the endpoint is a relative URL
+                parsed_endpoint = urlparse(self.message_endpoint)
+                if not parsed_endpoint.netloc:
+                    # It's a relative URL, so join it with the base URL
+                    parsed_url = urlparse(self.config.server_url)
+                    base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                    send_message_url = urljoin(base_url, self.message_endpoint)
+                else:
+                    # It's an absolute URL
+                    send_message_url = self.message_endpoint
+            else:
+                # Fall back to constructing the URL from the server URL
+                from urllib.parse import urlparse, urljoin
+                
+                # Extract the base URL (preserving the full path structure)
+                parsed_url = urlparse(self.config.server_url)
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/sse', 1)[0]}"
+                send_message_url = f"{base_url}/send_message"
             
             # Print the send message URL for debugging
             print(f"DEBUG: Send message URL: {send_message_url}")
