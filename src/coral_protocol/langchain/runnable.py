@@ -45,6 +45,11 @@ class CoralRunnable(Generic[T]):
         self.running = False
         self.sse_thread = None
         self.message_endpoint = None  # Endpoint for sending messages
+        self.session_id = None  # Session ID for the current connection
+        self.connected = False  # Whether we're currently connected to the SSE endpoint
+        self.connection_attempts = 0  # Number of connection attempts
+        self.last_event_time = 0  # Time of the last received event
+        self.known_agents = []  # List of known agents
         
         logger.info(f"Initialized Coral Runnable with {len(functions)} functions")
     
@@ -71,147 +76,341 @@ class CoralRunnable(Generic[T]):
             print(f"DEBUG: Registration URL: {registration_url}")
             
             # Prepare the registration data
+            agent_id = self.config.did.split(':')[-1]  # Use the last part of the DID as the agent ID
             registration_data = {
-                "agentId": self.config.did.split(':')[-1],  # Use the last part of the DID as the agent ID
+                "agentId": agent_id,
                 "agentDescription": self.config.capability_document.get("description", "Angus Agent"),
                 "waitForAgents": 2  # Wait for 2 agents to be available
             }
             
-            # Send the registration request
-            logger.info(f"Registering agent with Coral Protocol server: {registration_url}")
+            # Try direct registration first
+            try:
+                # Send the registration request
+                logger.info(f"Attempting direct registration with Coral Protocol server: {registration_url}")
+                
+                response = requests.post(
+                    registration_url,
+                    json=registration_data,
+                    headers=self.config.headers,
+                    timeout=self.config.timeout,
+                    verify=self.config.verify_ssl
+                )
+                
+                # Check if registration was successful
+                if response.status_code == 200:
+                    registration_result = response.json()
+                    agent_did = registration_result.get("agentDid")
+                    logger.info(f"Agent registered successfully with DID: {agent_did}")
+                    self.registered = True
+                    return True
+                else:
+                    # Don't treat this as an error, just log it
+                    logger.info(f"Direct registration returned {response.status_code}, falling back to SSE")
+            except Exception as e:
+                logger.info(f"Direct registration attempt failed: {str(e)}, falling back to SSE")
             
-            response = requests.post(
-                registration_url,
-                json=registration_data,
-                headers=self.config.headers,
-                timeout=self.config.timeout,
-                verify=self.config.verify_ssl
-            )
+            # Fall back to SSE registration
+            logger.info("Using SSE connection for registration")
             
-            # Check if registration was successful
-            if response.status_code == 200:
-                registration_result = response.json()
-                agent_did = registration_result.get("agentDid")
-                logger.info(f"Agent registered successfully with DID: {agent_did}")
-                self.registered = True
-                return True
-            else:
-                logger.error(f"Failed to register agent: {response.status_code} - {response.text}")
-                
-                # Try an alternative approach - maybe the registration is handled via SSE
-                logger.info("Trying alternative registration approach via SSE connection")
-                
-                # Just connect to the SSE endpoint with the agent parameters as query parameters
-                agent_id = self.config.did.split(':')[-1]
-                sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2"
-                logger.info(f"Connecting to SSE URL: {sse_url}")
-                
-                # We'll consider this a success for now and let the SSE listener handle the rest
-                self.registered = True
-                return True
+            # Construct the SSE URL with agent parameters
+            sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2"
+            logger.info(f"Connecting to SSE URL: {sse_url}")
+            
+            # We'll consider this a success and let the SSE listener handle the rest
+            self.registered = True
+            return True
                 
         except Exception as e:
-            logger.error(f"Error registering agent: {str(e)}")
+            logger.error(f"Error in registration process: {str(e)}")
             return False
     
     def start_sse_listener(self):
         """
-        Start listening for SSE events from the Coral Protocol server.
+        Start listening for SSE events from the Coral Protocol server with robust reconnection.
+        """
+        max_retries = 5
+        base_delay = 1  # Start with 1 second delay
+        max_delay = 30  # Maximum delay of 30 seconds
+        
+        # Initialize connection state
+        self.connected = False
+        self.connection_attempts = 0
+        self.last_event_time = time.time()
+        
+        # Start heartbeat thread
+        self._start_heartbeat_thread()
+        
+        while self.running and self.connection_attempts < max_retries:
+            try:
+                # Construct the SSE URL with agent parameters
+                agent_id = self.config.did.split(':')[-1]
+                sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2"
+                
+                # Start the SSE client
+                logger.info(f"Starting SSE listener (attempt {self.connection_attempts + 1}/{max_retries}): {sse_url}")
+                
+                # Set up headers
+                headers = {
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache"
+                }
+                headers.update(self.config.headers)
+                
+                # Make the request
+                response = requests.get(
+                    sse_url,
+                    stream=True,
+                    headers=headers,
+                    timeout=None,  # No timeout for SSE
+                    verify=self.config.verify_ssl
+                )
+                
+                # Check if the request was successful
+                if response.status_code != 200:
+                    logger.error(f"Failed to connect to SSE: {response.status_code} - {response.text}")
+                    raise requests.exceptions.RequestException(f"Failed to connect to SSE: {response.status_code}")
+                
+                # Create the SSE client
+                client = sseclient.SSEClient(response)
+                
+                # Reset connection state
+                self.connected = True
+                self.connection_attempts = 0
+                
+                # Process events
+                for event in client.events():
+                    # Update last event time
+                    self.last_event_time = time.time()
+                    
+                    # Process the event
+                    self._handle_sse_event(event)
+                    
+                    # Check if we should stop
+                    if not self.running:
+                        break
+                
+                # If we exit the loop, the connection was closed
+                logger.warning("SSE event stream ended, will attempt reconnection")
+                self.connected = False
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error connecting to SSE: {str(e)}")
+                self.connected = False
+            except Exception as e:
+                logger.error(f"Unexpected error in SSE connection: {str(e)}")
+                logger.exception("Full exception details:")
+                self.connected = False
+            
+            # Only increment connection attempts if we're still running
+            if self.running:
+                self.connection_attempts += 1
+                
+                # Calculate delay with exponential backoff
+                if self.connection_attempts < max_retries:
+                    delay = min(base_delay * (2 ** (self.connection_attempts - 1)), max_delay)
+                    logger.info(f"Reconnecting in {delay} seconds (attempt {self.connection_attempts}/{max_retries})...")
+                    time.sleep(delay)
+        
+        if self.connection_attempts >= max_retries:
+            logger.error(f"Failed to establish stable connection after {max_retries} attempts")
+        
+        self.connected = False
+    
+    def _start_heartbeat_thread(self):
+        """Start a thread to monitor connection health."""
+        def heartbeat_check():
+            heartbeat_interval = 30  # Check every 30 seconds
+            max_silence = 90  # Consider connection dead after 90 seconds of silence
+            
+            while self.running:
+                time.sleep(heartbeat_interval)
+                
+                # Check if we've received an event recently
+                if self.connected and time.time() - self.last_event_time > max_silence:
+                    logger.warning(f"No events received for {max_silence} seconds, reconnecting...")
+                    self.connected = False
+                    
+                    # Start a new SSE listener thread
+                    if self.running:
+                        new_thread = threading.Thread(target=self.start_sse_listener)
+                        new_thread.daemon = True
+                        new_thread.start()
+                        break
+        
+        # Start heartbeat thread
+        heartbeat_thread = threading.Thread(target=heartbeat_check, daemon=True)
+        heartbeat_thread.start()
+    
+    def _handle_sse_event(self, event):
+        """
+        Handle an SSE event with comprehensive type handling.
+        
+        Args:
+            event: The SSE event to handle
         """
         try:
-            # Construct the SSE URL with agent parameters
-            agent_id = self.config.did.split(':')[-1]
-            sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2"
+            # Log the raw event for debugging
+            logger.debug(f"Raw SSE event: {event}")
+            logger.debug(f"Event data: '{event.data}'")
+            logger.debug(f"Event type: '{event.event}'")
+            logger.info(f"Received SSE event: {event.event} - {event.data}")
             
-            # Start the SSE client
-            logger.info(f"Starting SSE listener: {sse_url}")
-            
-            # Set up headers
-            headers = {
-                "Accept": "text/event-stream",
-                "Cache-Control": "no-cache"
-            }
-            headers.update(self.config.headers)
-            
-            # Make the request
-            response = requests.get(
-                sse_url,
-                stream=True,
-                headers=headers,
-                timeout=None,  # No timeout for SSE
-                verify=self.config.verify_ssl
-            )
-            
-            # Check if the request was successful
-            if response.status_code != 200:
-                logger.error(f"Failed to connect to SSE: {response.status_code} - {response.text}")
-                return
-            
-            # Create the SSE client
-            client = sseclient.SSEClient(response)
-            
-            # Process events
-            for event in client.events():
-                try:
-                    # Log the raw event for debugging
-                    logger.debug(f"Raw SSE event: {event}")
-                    logger.debug(f"Event data: '{event.data}'")
-                    logger.debug(f"Event type: '{event.event}'")
-                    logger.info(f"Received SSE event: {event.event} - {event.data}")
-                    
-                    # Handle 'endpoint' events specially
-                    if event.event == "endpoint":
-                        logger.info(f"Received endpoint event: {event.data}")
-                        # Store the endpoint for future use
-                        self.message_endpoint = event.data
-                        continue
-                    
-                    # Skip empty events
-                    if not event.data or event.data.isspace():
-                        logger.debug("Skipping empty event data")
-                        continue
-                    
-                    # Try to parse the JSON data
-                    try:
-                        event_data = json.loads(event.data)
-                        event_type = event_data.get("type")
-                        
-                        # Handle different event types
-                        if event_type == "mention":
-                            self.handle_mention(event_data)
-                        elif event_type == "thread_update":
-                            self.handle_thread_update(event_data)
-                        elif event_type == "registration":
-                            self.handle_registration(event_data)
-                        else:
-                            logger.info(f"Received unknown event type: {event_type}")
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to parse event data as JSON: {str(e)}")
-                        logger.warning(f"Raw data: '{event.data}'")
-                        # Try to handle non-JSON event data based on event type
-                        if event.event == "message":
-                            logger.info(f"Received message event with non-JSON data: {event.data}")
-                            # Handle message event with non-JSON data
-                        elif event.event == "registration":
-                            logger.info(f"Received registration event with non-JSON data: {event.data}")
-                            # Handle registration event with non-JSON data
-                        
-                except Exception as e:
-                    logger.error(f"Error processing SSE event: {str(e)}")
-                    
-                # Check if we should stop
-                if not self.running:
-                    break
-                    
+            # Handle different event types
+            if event.event == "endpoint":
+                self._handle_endpoint_event(event.data)
+            elif event.event == "message":
+                self._handle_message_event(event.data)
+            elif event.event == "agent_joined":
+                self._handle_agent_joined_event(event.data)
+            elif event.event == "agent_left":
+                self._handle_agent_left_event(event.data)
+            elif event.event == "error":
+                self._handle_error_event(event.data)
+            elif event.event == "heartbeat" or not event.event:
+                # Just log heartbeats
+                logger.debug("Received heartbeat event")
+            else:
+                # For unknown event types, try to handle based on the data
+                self._handle_unknown_event(event)
+                
         except Exception as e:
-            logger.error(f"Error in SSE listener: {str(e)}")
+            logger.error(f"Error processing SSE event: {str(e)}")
+            logger.exception("Full exception details:")
+    
+    def _handle_endpoint_event(self, data):
+        """
+        Handle an endpoint event.
+        
+        Args:
+            data: The event data
+        """
+        logger.info(f"Received endpoint event: {data}")
+        
+        # Store the endpoint for future use
+        self.message_endpoint = data
+        
+        # Extract session ID if present
+        if "sessionId=" in data:
+            self.session_id = data.split("sessionId=")[1].split("&")[0]
+            logger.info(f"Extracted session ID: {self.session_id}")
+    
+    def _handle_message_event(self, data):
+        """
+        Handle a message event.
+        
+        Args:
+            data: The event data
+        """
+        logger.info(f"Received message event")
+        
+        # Skip empty events
+        if not data or data.isspace():
+            logger.debug("Skipping empty message data")
+            return
+        
+        try:
+            # Try to parse as JSON
+            message_data = json.loads(data)
+            logger.info(f"Message content: {message_data}")
             
-            # Try to reconnect after a delay
-            if self.running:
-                time.sleep(5)
-                self.sse_thread = threading.Thread(target=self.start_sse_listener)
-                self.sse_thread.daemon = True
-                self.sse_thread.start()
+            # Process the message based on its type
+            if "type" in message_data:
+                event_type = message_data["type"]
+                if event_type == "mention":
+                    self.handle_mention(message_data)
+                elif event_type == "thread_update":
+                    self.handle_thread_update(message_data)
+                elif event_type == "registration":
+                    self.handle_registration(message_data)
+                else:
+                    logger.info(f"Received unknown message type: {event_type}")
+        except json.JSONDecodeError as e:
+            logger.warning(f"Message event data is not valid JSON: {str(e)}")
+            logger.warning(f"Raw data: '{data}'")
+            # Try to handle non-JSON message data
+            logger.info(f"Received message event with non-JSON data: {data}")
+    
+    def _handle_agent_joined_event(self, data):
+        """
+        Handle an agent joined event.
+        
+        Args:
+            data: The event data
+        """
+        logger.info(f"Agent joined: {data}")
+        
+        try:
+            if data and not data.isspace():
+                try:
+                    agent_data = json.loads(data)
+                    logger.info(f"Agent joined: {agent_data.get('name', 'Unknown')} ({agent_data.get('did', 'Unknown DID')})")
+                    
+                    # Add to known agents
+                    self.known_agents.append(agent_data)
+                except json.JSONDecodeError:
+                    logger.warning(f"Agent joined event data is not valid JSON: {data}")
+        except Exception as e:
+            logger.error(f"Error handling agent joined event: {str(e)}")
+    
+    def _handle_agent_left_event(self, data):
+        """
+        Handle an agent left event.
+        
+        Args:
+            data: The event data
+        """
+        logger.info(f"Agent left: {data}")
+        
+        try:
+            if data and not data.isspace():
+                try:
+                    agent_data = json.loads(data)
+                    agent_id = agent_data.get('did', agent_data.get('id', None))
+                    logger.info(f"Agent left: {agent_data.get('name', 'Unknown')} ({agent_id})")
+                    
+                    # Remove from known agents
+                    if agent_id:
+                        self.known_agents = [a for a in self.known_agents if a.get('did', a.get('id', None)) != agent_id]
+                except json.JSONDecodeError:
+                    logger.warning(f"Agent left event data is not valid JSON: {data}")
+        except Exception as e:
+            logger.error(f"Error handling agent left event: {str(e)}")
+    
+    def _handle_error_event(self, data):
+        """
+        Handle an error event.
+        
+        Args:
+            data: The event data
+        """
+        logger.error(f"Received error event: {data}")
+    
+    def _handle_unknown_event(self, event):
+        """
+        Handle an unknown event type.
+        
+        Args:
+            event: The SSE event
+        """
+        logger.info(f"Received unknown event type: {event.event}")
+        
+        # Try to parse the data as JSON
+        if event.data and not event.data.isspace():
+            try:
+                event_data = json.loads(event.data)
+                event_type = event_data.get("type")
+                
+                # Handle based on the event data type
+                if event_type == "mention":
+                    self.handle_mention(event_data)
+                elif event_type == "thread_update":
+                    self.handle_thread_update(event_data)
+                elif event_type == "registration":
+                    self.handle_registration(event_data)
+                else:
+                    logger.info(f"Received unknown event data type: {event_type}")
+            except json.JSONDecodeError:
+                logger.warning(f"Unknown event data is not valid JSON: {event.data}")
     
     def handle_mention(self, event_data: Dict[str, Any]):
         """
