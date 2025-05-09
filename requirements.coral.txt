@@ -4,3 +4,4 @@ langchain_mcp_adapters==0.0.11
 langchain-openai>=0.0.5
 python-dotenv>=1.0.0
 sseclient-py>=1.8.0
+supabase>=0.7.1
