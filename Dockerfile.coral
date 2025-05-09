@@ -10,6 +10,9 @@ COPY youtube_client.py .
 COPY angus_coral_agent.py .
 COPY data /app/data
 
+# Add a build argument to force cache invalidation
+ARG CACHEBUST=1
+
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.coral.txt
 RUN pip install --no-cache-dir supabase==2.15.1
