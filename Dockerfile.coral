@@ -13,6 +13,7 @@ COPY data /app/data
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.coral.txt
 RUN pip install --no-cache-dir supabase==2.15.1
+RUN pip install --no-cache-dir google-api-python-client>=2.0.0 google-auth>=2.0.0 google-auth-oauthlib>=0.4.0 google-auth-httplib2>=0.1.0
 
 # Set environment variables
 ENV CORAL_SERVER_URL=https://coral.pushcollective.club/sse
