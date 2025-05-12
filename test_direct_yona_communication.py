@@ -105,8 +105,19 @@ async def list_agents(client) -> List[Dict[str, Any]]:
         List of agents
     """
     try:
-        # Get the list_agents tool
-        list_agents_tool = client.get_tools()["coral"]["list_agents"]
+        # Get all tools
+        tools = client.get_tools()
+        
+        # Find the list_agents tool
+        list_agents_tool = None
+        for tool in tools:
+            if tool.name == "list_agents" and tool.server_name == "coral":
+                list_agents_tool = tool
+                break
+        
+        if not list_agents_tool:
+            logger.error("list_agents tool not found")
+            return []
         
         # Call the tool
         result = await list_agents_tool.ainvoke({})
@@ -132,8 +143,19 @@ async def create_thread(client, participants: List[str], metadata: Dict[str, Any
         Thread ID if successful, None otherwise
     """
     try:
-        # Get the create_thread tool
-        create_thread_tool = client.get_tools()["coral"]["create_thread"]
+        # Get all tools
+        tools = client.get_tools()
+        
+        # Find the create_thread tool
+        create_thread_tool = None
+        for tool in tools:
+            if tool.name == "create_thread" and tool.server_name == "coral":
+                create_thread_tool = tool
+                break
+        
+        if not create_thread_tool:
+            logger.error("create_thread tool not found")
+            return None
         
         # Call the tool
         result = await create_thread_tool.ainvoke({
@@ -166,8 +188,19 @@ async def send_message(client, thread_id: str, content: str, mentions: List[str]
         True if successful, False otherwise
     """
     try:
-        # Get the send_message tool
-        send_message_tool = client.get_tools()["coral"]["send_message"]
+        # Get all tools
+        tools = client.get_tools()
+        
+        # Find the send_message tool
+        send_message_tool = None
+        for tool in tools:
+            if tool.name == "send_message" and tool.server_name == "coral":
+                send_message_tool = tool
+                break
+        
+        if not send_message_tool:
+            logger.error("send_message tool not found")
+            return False
         
         # Call the tool
         result = await send_message_tool.ainvoke({
@@ -196,8 +229,19 @@ async def wait_for_mentions(client, timeout: int = 30) -> List[Dict[str, Any]]:
         List of mentions
     """
     try:
-        # Get the wait_for_mentions tool
-        wait_for_mentions_tool = client.get_tools()["coral"]["wait_for_mentions"]
+        # Get all tools
+        tools = client.get_tools()
+        
+        # Find the wait_for_mentions tool
+        wait_for_mentions_tool = None
+        for tool in tools:
+            if tool.name == "wait_for_mentions" and tool.server_name == "coral":
+                wait_for_mentions_tool = tool
+                break
+        
+        if not wait_for_mentions_tool:
+            logger.error("wait_for_mentions tool not found")
+            return []
         
         # Call the tool
         result = await wait_for_mentions_tool.ainvoke({
