@@ -30,7 +30,7 @@ try:
 except ImportError:
     logger.error("langchain_mcp_adapters is not installed. Installing...")
     import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "langchain_mcp_adapters==0.0.11"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "langchain_mcp_adapters==0.0.10"])
     from langchain_mcp_adapters.client import MultiServerMCPClient
 
 try:

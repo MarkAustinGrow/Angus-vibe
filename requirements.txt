@@ -14,3 +14,4 @@ pytube>=12.1.0
 pydub>=0.25.1
 uuid>=1.30
 tblib>=1.7.0
+langchain_mcp_adapters==0.0.10
