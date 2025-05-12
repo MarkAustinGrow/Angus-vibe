@@ -141,7 +141,7 @@ def get_session_id(container_name=None, log_file=None):
 session_id = None
 
 # Get the server URL
-server_url = os.environ.get('CORAL_SERVER_URL', 'http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse')
+server_url = os.environ.get('CORAL_SERVER_URL', 'http://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse')
 
 # Parse the server URL to extract components
 parsed_url = urlparse(server_url)

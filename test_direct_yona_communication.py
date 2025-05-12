@@ -88,8 +88,15 @@ def parse_args():
     parser.add_argument(
         '--timeout',
         type=int,
-        default=30,
+        default=300,
         help='Timeout for operations in seconds'
+    )
+    
+    parser.add_argument(
+        '--wait-for-agents',
+        type=int,
+        default=2,
+        help='Number of agents to wait for'
     )
     
     return parser.parse_args()
@@ -105,32 +112,30 @@ async def list_agents(client) -> List[Dict[str, Any]]:
         List of agents
     """
     try:
-        # Get all tools
-        tools = client.get_tools()
+        # Call the list_agents tool using the connection object
+        result = await client.connections["coral"].invoke_tool("list_agents", {})
         
-        # Print tool information for debugging
-        logger.info(f"Available tools: {len(tools)}")
-        for i, tool in enumerate(tools):
-            logger.info(f"Tool {i}: {tool.name}, {dir(tool)}")
-        
-        # Find the list_agents tool
-        list_agents_tool = None
-        for tool in tools:
-            if tool.name == "list_agents":
-                list_agents_tool = tool
-                break
-        
-        if not list_agents_tool:
-            logger.error("list_agents tool not found")
-            return []
-        
-        # Call the tool
-        result = await list_agents_tool.ainvoke({})
+        # Handle string response
+        if isinstance(result, str):
+            try:
+                import json
+                result = json.loads(result)
+            except json.JSONDecodeError:
+                logger.warning(f"Could not parse result as JSON: {result}")
         
         # Log the result
         logger.info(f"Registered agents: {result}")
         
-        return result
+        # If result is a list, return it directly
+        if isinstance(result, list):
+            return result
+        # If result is a dictionary with an 'agents' key, return the agents
+        elif isinstance(result, dict) and 'agents' in result:
+            return result['agents']
+        # Otherwise, return an empty list
+        else:
+            logger.warning(f"Unexpected result format: {result}")
+            return []
     except Exception as e:
         logger.error(f"Error listing agents: {str(e)}")
         return []
@@ -148,25 +153,20 @@ async def create_thread(client, participants: List[str], metadata: Dict[str, Any
         Thread ID if successful, None otherwise
     """
     try:
-        # Get all tools
-        tools = client.get_tools()
-        
-        # Find the create_thread tool
-        create_thread_tool = None
-        for tool in tools:
-            if tool.name == "create_thread":
-                create_thread_tool = tool
-                break
-        
-        if not create_thread_tool:
-            logger.error("create_thread tool not found")
-            return None
-        
-        # Call the tool
-        result = await create_thread_tool.ainvoke({
+        # Call the create_thread tool using the connection object
+        result = await client.connections["coral"].invoke_tool("create_thread", {
             "participants": participants,
             "metadata": metadata or {"purpose": "test"}
         })
+        
+        # Handle string response
+        if isinstance(result, str):
+            try:
+                import json
+                result = json.loads(result)
+            except json.JSONDecodeError:
+                logger.warning(f"Could not parse result as JSON: {result}")
+                return None
         
         # Log the result
         logger.info(f"Created thread: {result}")
@@ -193,26 +193,20 @@ async def send_message(client, thread_id: str, content: str, mentions: List[str]
         True if successful, False otherwise
     """
     try:
-        # Get all tools
-        tools = client.get_tools()
-        
-        # Find the send_message tool
-        send_message_tool = None
-        for tool in tools:
-            if tool.name == "send_message":
-                send_message_tool = tool
-                break
-        
-        if not send_message_tool:
-            logger.error("send_message tool not found")
-            return False
-        
-        # Call the tool
-        result = await send_message_tool.ainvoke({
+        # Call the send_message tool using the connection object
+        result = await client.connections["coral"].invoke_tool("send_message", {
             "thread_id": thread_id,
             "content": content,
             "mentions": mentions
         })
+        
+        # Handle string response
+        if isinstance(result, str):
+            try:
+                import json
+                result = json.loads(result)
+            except json.JSONDecodeError:
+                logger.warning(f"Could not parse result as JSON: {result}")
         
         # Log the result
         logger.info(f"Sent message: {result}")
@@ -234,29 +228,33 @@ async def wait_for_mentions(client, timeout: int = 30) -> List[Dict[str, Any]]:
         List of mentions
     """
     try:
-        # Get all tools
-        tools = client.get_tools()
-        
-        # Find the wait_for_mentions tool
-        wait_for_mentions_tool = None
-        for tool in tools:
-            if tool.name == "wait_for_mentions":
-                wait_for_mentions_tool = tool
-                break
-        
-        if not wait_for_mentions_tool:
-            logger.error("wait_for_mentions tool not found")
-            return []
-        
-        # Call the tool
-        result = await wait_for_mentions_tool.ainvoke({
+        # Call the wait_for_mentions tool using the connection object
+        result = await client.connections["coral"].invoke_tool("wait_for_mentions", {
             "timeout": timeout
         })
+        
+        # Handle string response
+        if isinstance(result, str):
+            try:
+                import json
+                result = json.loads(result)
+            except json.JSONDecodeError:
+                logger.warning(f"Could not parse result as JSON: {result}")
+                return []
         
         # Log the result
         logger.info(f"Received mentions: {result}")
         
-        return result
+        # If result is a list, return it directly
+        if isinstance(result, list):
+            return result
+        # If result is a dictionary with a 'mentions' key, return the mentions
+        elif isinstance(result, dict) and 'mentions' in result:
+            return result['mentions']
+        # Otherwise, return an empty list
+        else:
+            logger.warning(f"Unexpected result format: {result}")
+            return []
     except Exception as e:
         logger.error(f"Error waiting for mentions: {str(e)}")
         return []
@@ -326,7 +324,7 @@ async def main():
     import urllib.parse
     params = {
         "agentId": args.agent_id,
-        "waitForAgents": 2,
+        "waitForAgents": args.wait_for_agents,
         "agentDescription": args.agent_description
     }
     query_string = urllib.parse.urlencode(params)
