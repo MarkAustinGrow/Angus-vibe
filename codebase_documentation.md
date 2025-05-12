@@ -1103,9 +1103,104 @@ comment on table influence_music is 'Stores music analysis results for influence
 | `analysis`     | `jsonb`     | JSON data with OpenAI analysis results      |
 | `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
 
-### 8. Angus Coral Agent (angus_coral_agent.py)
+### 8. Coral Protocol Integration
 
-The `AngusCoral` class provides integration between Angus and the Coral Protocol, allowing Angus to participate in a multi-agent ecosystem.
+Agent Angus integrates with the Coral Protocol to enable communication with other AI agents in a multi-agent ecosystem. There are two approaches to this integration:
+
+#### 8.1 Direct Integration (angus_coral_agent.py)
+
+The `AngusCoral` class provides direct integration between Angus and the Coral Protocol, allowing Angus to participate in a multi-agent ecosystem.
+
+#### 8.2 Agent-Based Integration (agent_yona_communication.py)
+
+The agent-based approach uses LangChain to create an agent that can interact with the Coral Protocol server. This approach is particularly useful for communicating with other agents like Yona.
+
+##### Script: `agent_yona_communication.py`
+
+```python
+def main():
+    """
+    Main entry point for the script.
+    """
+    # Parse command line arguments
+    args = parse_args()
+    
+    # Construct the SSE URL with agent parameters
+    params = {
+        "agentId": args.agent_id,
+        "waitForAgents": args.wait_for_agents,
+        "agentDescription": args.agent_description
+    }
+    query_string = urllib.parse.urlencode(params)
+    server_url = f"{args.server_url}?{query_string}"
+    
+    # Create the MCP client
+    async with MultiServerMCPClient(
+        connections={
+            "coral": {
+                "transport": "sse",
+                "url": server_url,
+                "timeout": args.timeout,
+                "sse_read_timeout": args.timeout,
+            }
+        }
+    ) as client:
+        # Get tools from the client
+        tools = client.get_tools()
+        
+        # Create an agent with those tools
+        agent = create_tool_calling_agent(model, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        
+        # Run the agent
+        result = await agent_executor.ainvoke({})
+```
+
+**Description**: This script implements an agent-based approach to communicate with the Coral Protocol server. It connects to the server, gets the available tools, creates an agent with those tools, and uses the agent to interact with other agents like Yona.
+
+**Key Features**:
+- Uses `langchain_mcp_adapters` version 0.0.10 for compatibility with the Coral server
+- Gets tools using `client.get_tools()` instead of directly invoking tools
+- Creates an agent with LangChain's `create_tool_calling_agent` function
+- Uses an agent executor to run the agent with the available tools
+
+**Available Tools**:
+- `list_agents`: List all registered agents
+- `create_thread`: Create a new thread with participants
+- `add_participant`: Add a participant to a thread
+- `remove_participant`: Remove a participant from a thread
+- `close_thread`: Close a thread with a summary
+- `send_message`: Send a message to a thread
+- `wait_for_mentions`: Wait until mentioned by another agent
+
+##### Script: `run_agent_yona.sh` / `run_agent_yona.bat`
+
+These scripts provide a convenient way to run the agent-based communication script on Linux/macOS and Windows respectively.
+
+**Parameters**:
+- `--server-url`: URL of the Coral Protocol server
+- `--agent-id`: ID of this agent
+- `--agent-description`: Description of this agent
+- `--yona-id`: ID of the Yona agent to look for
+- `--prompt`: Prompt for the song creation
+- `--timeout`: Timeout for operations in seconds
+- `--wait-for-agents`: Number of agents to wait for
+- `--model`: OpenAI model to use for the agent
+
+**Example Usage**:
+```bash
+# Run with default parameters
+./run_agent_yona.sh
+
+# Run with custom parameters
+./run_agent_yona.sh --wait-for-agents 1 --prompt "Create a jazz song about AI"
+```
+
+**Requirements**:
+- OpenAI API key (set in the environment or .env file)
+- langchain_mcp_adapters==0.0.10
+- langchain>=0.0.335
+- langchain-openai>=0.0.2
 
 #### Class: `AngusCoral`
 
