@@ -113,7 +113,8 @@ class CoralRunnable(Generic[T]):
             logger.info("Using SSE connection for registration")
             
             # Construct the SSE URL with agent parameters
-            sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2"
+            agent_description = self.config.capability_document.get("description", "Angus Agent")
+            sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2&agentDescription={agent_description}"
             logger.info(f"Connecting to SSE URL: {sse_url}")
             
             # We'll consider this a success and let the SSE listener handle the rest
@@ -144,7 +145,8 @@ class CoralRunnable(Generic[T]):
             try:
                 # Construct the SSE URL with agent parameters
                 agent_id = self.config.did.split(':')[-1]
-                sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2"
+                agent_description = self.config.capability_document.get("description", "Angus Agent")
+                sse_url = f"{self.config.server_url}?agentId={agent_id}&waitForAgents=2&agentDescription={agent_description}"
                 
                 # Start the SSE client
                 logger.info(f"Starting SSE listener (attempt {self.connection_attempts + 1}/{max_retries}): {sse_url}")
