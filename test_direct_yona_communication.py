@@ -108,10 +108,15 @@ async def list_agents(client) -> List[Dict[str, Any]]:
         # Get all tools
         tools = client.get_tools()
         
+        # Print tool information for debugging
+        logger.info(f"Available tools: {len(tools)}")
+        for i, tool in enumerate(tools):
+            logger.info(f"Tool {i}: {tool.name}, {dir(tool)}")
+        
         # Find the list_agents tool
         list_agents_tool = None
         for tool in tools:
-            if tool.name == "list_agents" and tool.server_name == "coral":
+            if tool.name == "list_agents":
                 list_agents_tool = tool
                 break
         
@@ -149,7 +154,7 @@ async def create_thread(client, participants: List[str], metadata: Dict[str, Any
         # Find the create_thread tool
         create_thread_tool = None
         for tool in tools:
-            if tool.name == "create_thread" and tool.server_name == "coral":
+            if tool.name == "create_thread":
                 create_thread_tool = tool
                 break
         
@@ -194,7 +199,7 @@ async def send_message(client, thread_id: str, content: str, mentions: List[str]
         # Find the send_message tool
         send_message_tool = None
         for tool in tools:
-            if tool.name == "send_message" and tool.server_name == "coral":
+            if tool.name == "send_message":
                 send_message_tool = tool
                 break
         
@@ -235,7 +240,7 @@ async def wait_for_mentions(client, timeout: int = 30) -> List[Dict[str, Any]]:
         # Find the wait_for_mentions tool
         wait_for_mentions_tool = None
         for tool in tools:
-            if tool.name == "wait_for_mentions" and tool.server_name == "coral":
+            if tool.name == "wait_for_mentions":
                 wait_for_mentions_tool = tool
                 break
         
