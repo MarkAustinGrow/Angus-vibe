@@ -12,7 +12,7 @@ if "%OPENAI_API_KEY%"=="" (
 
 REM Set the Coral server URL if not already set
 if "%CORAL_SERVER_URL%"=="" (
-    set CORAL_SERVER_URL=http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse
+    set CORAL_SERVER_URL=http://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse
 )
 
 REM Install required packages

@@ -10,7 +10,7 @@ fi
 
 # Set the Coral server URL if not already set
 if [ -z "$CORAL_SERVER_URL" ]; then
-    export CORAL_SERVER_URL="http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse"
+    export CORAL_SERVER_URL="http://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse"
 fi
 
 # Install required packages

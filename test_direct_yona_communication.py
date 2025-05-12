@@ -53,7 +53,7 @@ def parse_args():
     parser.add_argument(
         '--server-url',
         type=str,
-        default=os.environ.get('CORAL_SERVER_URL', 'http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse'),
+        default=os.environ.get('CORAL_SERVER_URL', 'http://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse'),
         help='URL of the Coral Protocol server'
     )
     
@@ -105,11 +105,8 @@ async def list_agents(client) -> List[Dict[str, Any]]:
         List of agents
     """
     try:
-        # Get the list_agents tool
-        list_agents_tool = client.get_tool("coral", "list_agents")
-        
-        # Call the tool
-        result = await list_agents_tool.ainvoke({})
+        # Call the list_agents tool
+        result = await client.connections["coral"].invoke_tool("list_agents", {})
         
         # Log the result
         logger.info(f"Registered agents: {result}")
@@ -132,11 +129,8 @@ async def create_thread(client, participants: List[str], metadata: Dict[str, Any
         Thread ID if successful, None otherwise
     """
     try:
-        # Get the create_thread tool
-        create_thread_tool = client.get_tool("coral", "create_thread")
-        
-        # Call the tool
-        result = await create_thread_tool.ainvoke({
+        # Call the create_thread tool
+        result = await client.connections["coral"].invoke_tool("create_thread", {
             "participants": participants,
             "metadata": metadata or {"purpose": "test"}
         })
@@ -166,11 +160,8 @@ async def send_message(client, thread_id: str, content: str, mentions: List[str]
         True if successful, False otherwise
     """
     try:
-        # Get the send_message tool
-        send_message_tool = client.get_tool("coral", "send_message")
-        
-        # Call the tool
-        result = await send_message_tool.ainvoke({
+        # Call the send_message tool
+        result = await client.connections["coral"].invoke_tool("send_message", {
             "thread_id": thread_id,
             "content": content,
             "mentions": mentions
@@ -196,11 +187,8 @@ async def wait_for_mentions(client, timeout: int = 30) -> List[Dict[str, Any]]:
         List of mentions
     """
     try:
-        # Get the wait_for_mentions tool
-        wait_for_mentions_tool = client.get_tool("coral", "wait_for_mentions")
-        
-        # Call the tool
-        result = await wait_for_mentions_tool.ainvoke({
+        # Call the wait_for_mentions tool
+        result = await client.connections["coral"].invoke_tool("wait_for_mentions", {
             "timeout": timeout
         })
         

@@ -39,7 +39,8 @@ services:
     env_file:
       - .env
     environment:
-      - CORAL_SERVER_URL=http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse
+      - CORAL_SERVER_URL=http://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse
+      - AGENT_ID=agent_angus
     logging:
       driver: "json-file"
       options:
