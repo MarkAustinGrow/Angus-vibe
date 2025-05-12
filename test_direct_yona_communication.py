@@ -105,8 +105,11 @@ async def list_agents(client) -> List[Dict[str, Any]]:
         List of agents
     """
     try:
-        # Call the list_agents tool
-        result = await client.connections["coral"].invoke_tool("list_agents", {})
+        # Get the list_agents tool
+        list_agents_tool = client.get_tools()["coral"]["list_agents"]
+        
+        # Call the tool
+        result = await list_agents_tool.ainvoke({})
         
         # Log the result
         logger.info(f"Registered agents: {result}")
@@ -129,8 +132,11 @@ async def create_thread(client, participants: List[str], metadata: Dict[str, Any
         Thread ID if successful, None otherwise
     """
     try:
-        # Call the create_thread tool
-        result = await client.connections["coral"].invoke_tool("create_thread", {
+        # Get the create_thread tool
+        create_thread_tool = client.get_tools()["coral"]["create_thread"]
+        
+        # Call the tool
+        result = await create_thread_tool.ainvoke({
             "participants": participants,
             "metadata": metadata or {"purpose": "test"}
         })
@@ -160,8 +166,11 @@ async def send_message(client, thread_id: str, content: str, mentions: List[str]
         True if successful, False otherwise
     """
     try:
-        # Call the send_message tool
-        result = await client.connections["coral"].invoke_tool("send_message", {
+        # Get the send_message tool
+        send_message_tool = client.get_tools()["coral"]["send_message"]
+        
+        # Call the tool
+        result = await send_message_tool.ainvoke({
             "thread_id": thread_id,
             "content": content,
             "mentions": mentions
@@ -187,8 +196,11 @@ async def wait_for_mentions(client, timeout: int = 30) -> List[Dict[str, Any]]:
         List of mentions
     """
     try:
-        # Call the wait_for_mentions tool
-        result = await client.connections["coral"].invoke_tool("wait_for_mentions", {
+        # Get the wait_for_mentions tool
+        wait_for_mentions_tool = client.get_tools()["coral"]["wait_for_mentions"]
+        
+        # Call the tool
+        result = await wait_for_mentions_tool.ainvoke({
             "timeout": timeout
         })
         

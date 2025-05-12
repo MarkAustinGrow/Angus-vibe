@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument(
         '--server-url',
         type=str,
-        default=os.environ.get('CORAL_SERVER_URL', 'http://coral.pushcollective.club:3001/devmode/default-app/default-key/session1/sse'),
+        default=os.environ.get('CORAL_SERVER_URL', 'http://coral.pushcollective.club:5555/devmode/exampleApplication/privkey/session1/sse'),
         help='URL of the Coral Protocol server'
     )
     
