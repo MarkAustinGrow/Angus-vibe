@@ -160,7 +160,7 @@ class AngusYonaCommunicator:
                     
                     if list_agents_tool:
                         # Call the list_agents tool as a simple heartbeat
-                        await list_agents_tool.invoke({})
+                        await list_agents_tool.ainvoke({})
                         logger.debug("Heartbeat sent")
                     else:
                         logger.warning("list_agents tool not found for heartbeat")
@@ -194,7 +194,7 @@ class AngusYonaCommunicator:
                 return []
             
             # Call the list_agents tool
-            result = await list_agents_tool.invoke({"includeDetails": True})
+            result = await list_agents_tool.ainvoke({"includeDetails": True})
             
             # Handle string response
             if isinstance(result, str):
@@ -265,7 +265,7 @@ class AngusYonaCommunicator:
                 return None
             
             # Call the create_thread tool
-            result = await create_thread_tool.invoke({
+            result = await create_thread_tool.ainvoke({
                 "participants": participants,
                 "metadata": metadata or {"purpose": "Angus-Yona communication"}
             })
@@ -318,7 +318,7 @@ class AngusYonaCommunicator:
                 return False
             
             # Call the send_message tool
-            result = await send_message_tool.invoke({
+            result = await send_message_tool.ainvoke({
                 "thread_id": thread_id,
                 "content": content,
                 "mentions": mentions
@@ -365,7 +365,7 @@ class AngusYonaCommunicator:
                 return []
             
             # Call the wait_for_mentions tool
-            result = await wait_for_mentions_tool.invoke({
+            result = await wait_for_mentions_tool.ainvoke({
                 "timeout_ms": timeout_ms
             })
             
