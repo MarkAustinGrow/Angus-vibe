@@ -148,9 +148,22 @@ class AngusYonaCommunicator:
             try:
                 await asyncio.sleep(60)  # Send heartbeat every 60 seconds
                 if self.client and self.connected:
-                    # Use list_agents as a simple heartbeat
-                    await self.client.connections["coral"].invoke_tool("list_agents", {})
-                    logger.debug("Heartbeat sent")
+                    # Get the tools from the client
+                    tools = self.client.get_tools()
+                    
+                    # Find the list_agents tool
+                    list_agents_tool = None
+                    for tool in tools:
+                        if tool.name == "list_agents":
+                            list_agents_tool = tool
+                            break
+                    
+                    if list_agents_tool:
+                        # Call the list_agents tool as a simple heartbeat
+                        await list_agents_tool.invoke({})
+                        logger.debug("Heartbeat sent")
+                    else:
+                        logger.warning("list_agents tool not found for heartbeat")
             except asyncio.CancelledError:
                 logger.debug("Heartbeat task cancelled")
                 break
@@ -166,9 +179,22 @@ class AngusYonaCommunicator:
             List of agents
         """
         try:
-            # Call the list_agents tool using the connection object
-            connection = self.client.connections["coral"]
-            result = await connection.invoke_tool("list_agents", {})
+            # Get the tools from the client
+            tools = self.client.get_tools()
+            
+            # Find the list_agents tool
+            list_agents_tool = None
+            for tool in tools:
+                if tool.name == "list_agents":
+                    list_agents_tool = tool
+                    break
+            
+            if not list_agents_tool:
+                logger.error("list_agents tool not found")
+                return []
+            
+            # Call the list_agents tool
+            result = await list_agents_tool.invoke({"includeDetails": True})
             
             # Handle string response
             if isinstance(result, str):
@@ -224,9 +250,22 @@ class AngusYonaCommunicator:
             Thread ID if successful, None otherwise
         """
         try:
-            # Call the create_thread tool using the connection object
-            connection = self.client.connections["coral"]
-            result = await connection.invoke_tool("create_thread", {
+            # Get the tools from the client
+            tools = self.client.get_tools()
+            
+            # Find the create_thread tool
+            create_thread_tool = None
+            for tool in tools:
+                if tool.name == "create_thread":
+                    create_thread_tool = tool
+                    break
+            
+            if not create_thread_tool:
+                logger.error("create_thread tool not found")
+                return None
+            
+            # Call the create_thread tool
+            result = await create_thread_tool.invoke({
                 "participants": participants,
                 "metadata": metadata or {"purpose": "Angus-Yona communication"}
             })
@@ -264,9 +303,22 @@ class AngusYonaCommunicator:
             True if successful, False otherwise
         """
         try:
-            # Call the send_message tool using the connection object
-            connection = self.client.connections["coral"]
-            result = await connection.invoke_tool("send_message", {
+            # Get the tools from the client
+            tools = self.client.get_tools()
+            
+            # Find the send_message tool
+            send_message_tool = None
+            for tool in tools:
+                if tool.name == "send_message":
+                    send_message_tool = tool
+                    break
+            
+            if not send_message_tool:
+                logger.error("send_message tool not found")
+                return False
+            
+            # Call the send_message tool
+            result = await send_message_tool.invoke({
                 "thread_id": thread_id,
                 "content": content,
                 "mentions": mentions
@@ -298,9 +350,22 @@ class AngusYonaCommunicator:
             List of mentions
         """
         try:
-            # Call the wait_for_mentions tool using the connection object
-            connection = self.client.connections["coral"]
-            result = await connection.invoke_tool("wait_for_mentions", {
+            # Get the tools from the client
+            tools = self.client.get_tools()
+            
+            # Find the wait_for_mentions tool
+            wait_for_mentions_tool = None
+            for tool in tools:
+                if tool.name == "wait_for_mentions":
+                    wait_for_mentions_tool = tool
+                    break
+            
+            if not wait_for_mentions_tool:
+                logger.error("wait_for_mentions tool not found")
+                return []
+            
+            # Call the wait_for_mentions tool
+            result = await wait_for_mentions_tool.invoke({
                 "timeout_ms": timeout_ms
             })
             
