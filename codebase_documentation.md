@@ -22,8 +22,9 @@ Agent Angus consists of several key components that work together:
    - Analyzes music using OpenAI's API to extract insights about lyrics, mood, themes, and musical characteristics
 5. **Sonoteller Client (sonoteller_client.py)**: [DEPRECATED] Previously handled interactions with the Sonoteller API for music analysis. Retained for reference but no longer used.
 6. **Web UI (web_ui.py)**: Provides a web interface for analyzing music using the OpenAI API.
-7. **Database Schema (create_youtube_table.sql)**: Defines the structure of the YouTube table in Supabase.
-8. **Test Scripts**: Various scripts to test different aspects of the system.
+7. **YouTube Authentication (youtube_auth_standalone.py)**: Standalone script for generating YouTube OAuth tokens, particularly useful for server deployments and Docker containers.
+8. **Database Schema (create_youtube_table.sql)**: Defines the structure of the YouTube table in Supabase.
+9. **Test Scripts**: Various scripts to test different aspects of the system.
 
 ## Component Documentation
 
@@ -940,166 +941,18 @@ run_web_ui(port=8080)
 - Returns a 400 error if no analysis is provided
 - Returns a 500 error if saving fails
 
-### 7. YouTube Audio Extractor (youtube_audio_extractor.py)
+### 7. YouTube Authentication (youtube_auth_standalone.py)
 
-The `YouTubeAudioExtractor` class provides functionality to extract audio from YouTube videos for analysis with the Sonoteller API.
+The `youtube_auth_standalone.py` script provides a standalone solution for generating YouTube OAuth tokens, particularly useful for server deployments and Docker container environments where interactive authentication is required.
 
-#### Class: `YouTubeAudioExtractor`
-
-##### Constructor
+#### Function: `authenticate_youtube`
 
 ```python
-def __init__(self, temp_dir: Optional[str] = None)
+def authenticate_youtube() -> bool
 ```
 
-**Description**: Initializes the YouTube audio extractor.
+**Description**: Performs YouTube OAuth 2.0 authentication flow and saves the resulting token to a pickle file for use by the main application.
 
-**Parameters**:
-- `temp_dir` (Optional[str]): Optional directory to store temporary files. If not provided, system temp directory will be used.
-
-**Returns**: None
-
-**Example**:
-```python
-# Using system temp directory
-extractor = YouTubeAudioExtractor()
-
-# Using custom temp directory
-extractor = YouTubeAudioExtractor(temp_dir="/path/to/temp")
-```
-
-##### Method: `extract_audio`
-
-```python
-def extract_audio(self, youtube_url: str) -> str
-```
-
-**Description**: Extract audio from a YouTube video and save as MP3.
-
-**Parameters**:
-- `youtube_url` (str): URL of the YouTube video
+**Parameters**: None
 
 **Returns**:
-- `str`: Path to the extracted MP3 file
-
-**Example**:
-```python
-mp3_path = extractor.extract_audio("https://www.youtube.com/watch?v=VIDEO_ID")
-print(f"Audio extracted to: {mp3_path}")
-```
-
-**Error Handling**:
-- Uses pytube to download the highest quality audio stream
-- Converts the downloaded file to MP3 format
-- Provides detailed error information if the download fails
-
-##### Method: `get_file_url`
-
-```python
-def get_file_url(self, file_path: str) -> str
-```
-
-**Description**: Convert a local file path to a file:// URL.
-
-**Parameters**:
-- `file_path` (str): Path to the local file
-
-**Returns**:
-- `str`: file:// URL for the local file
-
-**Example**:
-```python
-file_url = extractor.get_file_url("/path/to/file.mp3")
-print(f"File URL: {file_url}")
-```
-
-##### Method: `cleanup`
-
-```python
-def cleanup(self, file_path: str) -> None
-```
-
-**Description**: Clean up a temporary file.
-
-**Parameters**:
-- `file_path` (str): Path to the file to clean up
-
-**Returns**: None
-
-**Example**:
-```python
-extractor.cleanup("/path/to/temp/file.mp3")
-```
-
-## Database Schema
-
-### YouTube Table
-
-The YouTube table tracks videos uploaded to YouTube:
-
-```sql
-create table if not exists youtube (
-  id uuid default uuid_generate_v4() primary key,
-  song_id uuid references songs(id),
-  youtube_id text unique,
-  title text,
-  description text,
-  upload_date timestamp with time zone default now(),
-  status text,
-  view_count integer default 0,
-  like_count integer default 0
-);
-
--- Create index for faster lookups
-create index if not exists youtube_song_id_idx on youtube(song_id);
-create index if not exists youtube_youtube_id_idx on youtube(youtube_id);
-create index if not exists youtube_status_idx on youtube(status);
-
--- Add comment to explain table purpose
-comment on table youtube is 'Tracks videos uploaded to YouTube from the songs table';
-```
-
-| Field Name      | Type        | Description                                  |
-|----------------|------------|----------------------------------------------|
-| `id` (PK)      | `uuid`      | Unique ID, primary key (auto-generated)     |
-| `song_id`      | `uuid`      | Reference to songs table                    |
-| `youtube_id`   | `text`      | YouTube video ID                            |
-| `title`        | `text`      | Video title on YouTube                      |
-| `description`  | `text`      | Video description on YouTube                |
-| `upload_date`  | `timestamp` | Timestamp of when the video was uploaded    |
-| `status`       | `text`      | Upload status (e.g., "pending", "uploaded", "failed") |
-| `view_count`   | `integer`   | Number of views (can be updated periodically) |
-| `like_count`   | `integer`   | Number of likes (can be updated periodically) |
-
-### Influence Music Table
-
-The Influence Music table stores music analysis results:
-
-```sql
-create table if not exists influence_music (
-  id uuid default uuid_generate_v4() primary key,
-  song_id uuid references songs(id),
-  url text not null,
-  analysis jsonb not null,
-  created_at timestamp with time zone default now()
-);
-
--- Create index for faster lookups
-create index if not exists influence_music_song_id_idx on influence_music(song_id);
-
--- Add comment to explain table purpose
-comment on table influence_music is 'Stores music analysis results for influence music';
-```
-
-| Field Name      | Type        | Description                                  |
-|----------------|------------|----------------------------------------------|
-| `id` (PK)      | `uuid`      | Unique ID, primary key (auto-generated)     |
-| `song_id`      | `uuid`      | Reference to songs table (optional)         |
-| `url`          | `text`      | URL of the analyzed music file              |
-| `analysis`     | `jsonb`     | JSON data with OpenAI analysis results      |
-| `created_at`   | `timestamp` | Timestamp of when the analysis was created  |
-
-## Test Scripts
-
-### test_angus.py
-Unit tests for Agent Angus using mocks to avoid making actual API calls.
