@@ -40,7 +40,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Default Coral server URL
-DEFAULT_CORAL_SERVER_URL = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
+DEFAULT_CORAL_SERVER_URL = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club:5555/devmode/app/priv/session1/sse")
 
 class CoralMCPServer:
     """
@@ -80,6 +80,9 @@ class CoralMCPServer:
                         "url": self.server_url,
                         "timeout": 5,
                         "sse_read_timeout": 60,  # Reduced timeout
+                        "headers": {
+                            "Accept": "text/event-stream"
+                        }
                     }
                 }
             )

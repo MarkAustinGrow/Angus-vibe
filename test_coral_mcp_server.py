@@ -33,7 +33,7 @@ async def test_connection():
     logger.info("Testing connection to Coral Protocol server...")
     
     # Get the server URL from environment variables or use default
-    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
+    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club:5555/devmode/app/priv/session1/sse")
     
     # Create the Coral MCP Server
     coral_server = CoralMCPServer(server_url=server_url)
@@ -52,7 +52,7 @@ async def test_agent_registration():
     logger.info("Testing agent registration...")
     
     # Get the server URL from environment variables or use default
-    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
+    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club:5555/devmode/app/priv/session1/sse")
     
     # Create the Coral MCP Server
     coral_server = CoralMCPServer(server_url=server_url)
@@ -79,7 +79,7 @@ async def test_list_agents():
     logger.info("Testing agent listing...")
     
     # Get the server URL from environment variables or use default
-    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
+    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club:5555/devmode/app/priv/session1/sse")
     
     # Create the Coral MCP Server
     coral_server = CoralMCPServer(server_url=server_url)
@@ -106,7 +106,7 @@ async def test_create_thread():
     logger.info("Testing thread creation...")
     
     # Get the server URL from environment variables or use default
-    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
+    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club:5555/devmode/app/priv/session1/sse")
     
     # Create the Coral MCP Server
     coral_server = CoralMCPServer(server_url=server_url)
@@ -141,7 +141,7 @@ async def test_send_message():
     logger.info("Testing message sending...")
     
     # Get the server URL from environment variables or use default
-    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club/sse")
+    server_url = os.getenv("CORAL_SERVER_URL", "http://coral.pushcollective.club:5555/devmode/app/priv/session1/sse")
     
     # Create the Coral MCP Server
     coral_server = CoralMCPServer(server_url=server_url)
