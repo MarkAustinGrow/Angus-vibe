@@ -267,7 +267,7 @@ class CoralMCPServer:
         
         # Register the agent
         register_tool = self.get_register_agent_tool()
-        result = await register_tool.acoroutine(self.agent_name, ["messaging", "coordination"])
+        result = await register_tool.arun(self.agent_name, ["messaging", "coordination"])
         
         logger.info(result)
         
